@@ -1,0 +1,1650 @@
+# MEMORY.md - Memoria persistente operativa
+
+## 2026-05-13 - Trabajo sobre Redmine 29699 / SVN dgiuseppe-2026.05 / Test_Britanico
+
+Resumen operativo de lo trabajado el 2026-05-13, para reutilizar más adelante:
+
+- Se registró credencial Redmine para el usuario `dgiuseppe`. La API key no debe exponerse ni copiarse en documentación.
+- Se realizó checkout SVN de la rama `Britanico/branches/2026.05` para el usuario SVN `dgiuseppe` en la working copy lógica `dgiuseppe-2026.05`.
+- Los primeros intentos de checkout fallaron por credenciales; el checkout válido fue con la tercera contraseña informada por el humano. No guardar ni reproducir contraseñas en memoria visible.
+- La working copy `dgiuseppe-2026.05` quedó registrada operativamente y lista para usar con credenciales SVN aisladas.
+- Se actualizó la rama SVN inicialmente hasta la revisión `8058`; luego se incorporaron cambios posteriores hasta revisiones `8059`, `8060`, `8061`, `8062`, `8063` y `8064` durante el trabajo.
+- Para el Redmine `29699`, se creó la carpeta `redmine/29699` y el documento `redmine/29699/29699.md`.
+- Se leyó e interpretó el Redmine `29699`, documentando el requerimiento en `29699.md`.
+- Se detectó que la nueva carpeta `backend/tablas` contiene un snapshot de estructura de tablas SQL Server:
+  - `extraccion-tables-definitions.sql`: query de extracción de metadata desde `sys.tables`, `sys.columns`, PKs y FKs.
+  - `tables-definitions.csv`: resultado exportado con columnas, tipos, nulos, PK y FK.
+- Interpretación técnica clave del Redmine 29699:
+  - La información de aportes/derivación fue separada entre `afi_deriv_aportes` y `afi_deriv_empresas`.
+  - `afi_deriv_aportes` ya no contiene, entre otras, `empresa`, `sueldo`, `cuit` y probablemente `deriva`.
+  - `afi_deriv_empresas` concentra datos de empresa/CUIT/sueldo.
+  - Los SPs que antes leían o escribían `cuit`, `empresa` o `sueldo` en `afi_deriv_aportes` deben ajustarse para usar `afi_deriv_empresas`.
+  - Riesgo principal: como `cuit` forma parte de la clave de `afi_deriv_empresas`, un join directo puede duplicar filas si existe más de una empresa/CUIT para la misma vigencia.
+- Se agregó el profile DB `Test_Britanico` con SQL Server, base `Test_Britanico`, host `172.16.10.110`, puerto `1433` y usuario `sa`. La contraseña no debe exponerse en respuestas ni documentación.
+- En `Test_Britanico`, tabla `dbo.compro_tipos`, se verificó que hay 9 tipos de comprobantes vigentes (`baja_fecha IS NULL`) y 0 dados de baja.
+- Tipos de comprobantes vigentes verificados:
+  - `CI` / Interno / Crédito Inicial
+  - `DC` / Interno / Documento Interno Cred
+  - `DI` / Interno / Documento Interno Deb
+  - `FC` / Legal / Factura
+  - `NC` / Legal / Nota de Crédito
+  - `ND` / Legal / Nota de Débito
+  - `RC` / Legal / Recibo
+  - `RS` / Interno / Resumen de Cuenta
+  - `SI` / Interno / Saldo Inicial
+- Se commiteó inicialmente el documento del Redmine 29699 en SVN:
+  - Revisión `8060`
+  - Archivo: `redmine/29699/29699.md`
+- Se actualizó la rama a revisión `8061` y se leyó el PDF `redmine/29699/AyD_28962_ModuloControldeAportes_V2.docx.pdf`.
+- Interpretación del PDF funcional:
+  - Especifica el Módulo Control de Aportes.
+  - Objetivo: registrar aportes/subsidios de afiliados individuales desregulados para cumplir con Resolución `1725/25 SSS`.
+  - Confirma que `AFI_DERIV_APORTES` conserva datos de derivación/aporte y `AFI_DERIV_EMPRESAS` concentra datos de empresa/CUIT/sueldo.
+  - `AFI_DERIV_EMPRESAS` contiene: `PREPAGA`, `CONTRA`, `INTE`, `VIGEN_DESDE`, `CUIT`, `ALTA_FECHA`, `BAJA_FECHA`, `EMPRESA`, `SUELDO`, `VIGEN_HASTA`.
+  - `AFI_DERIV_APORTES` contiene: `PREPAGA`, `CONTRA`, `INTE`, `VIGEN_DESDE`, `OBRA_SOC`, `ALTA_FECHA`, `BAJA_FECHA`, `VIGEN_HASTA`, `INTE_TITULAR`, `SISTEMA`, `MESES_A_ESTIMAR`, `APORTANTE_TIPO`, `LEGAJO`.
+- La interpretación del PDF se incorporó en `redmine/29699/29699.md` y se commiteó:
+  - Revisión `8062`
+  - Archivo: `redmine/29699/29699.md`
+- Se analizó el SP `afi_afu_cuenta_ddjj` en línea con Redmine 29699.
+- Diagnóstico inicial del SP `afi_afu_cuenta_ddjj`:
+  - Seguía usando `afi_deriv_aportes` con columnas que ya no pertenecen a esa tabla: `cuit`, `empresa`, `sueldo`, `fecha_act_sueldo`, `deriva`.
+  - El `IF NOT EXISTS` filtraba `afi_deriv_aportes` por `cuit`.
+  - El `INSERT INTO afi_deriv_aportes` intentaba insertar `cuit`, `empresa`, `sueldo`, `deriva`.
+  - El `UPDATE afi_deriv_aportes` actualizaba `sueldo` y `fecha_act_sueldo` filtrando por `cuit`.
+  - No seteaba `aportante_tipo`, hoy requerido por la estructura vigente.
+- Cambio necesario definido para `afi_afu_cuenta_ddjj`:
+  - Separar la operación en `afi_deriv_aportes` y `afi_deriv_empresas`.
+  - `afi_deriv_aportes` debe quedar con datos de derivación: `prepaga`, `contra`, `inte`, `vigen_desde`, `obra_soc`, `legajo`, `alta_fecha`, `baja_fecha`, `vigen_hasta`, `meses_a_estimar`, `inte_titular`, `sistema`, `aportante_tipo`.
+  - `afi_deriv_empresas` debe recibir datos de empresa: `prepaga`, `contra`, `inte`, `vigen_desde`, `cuit`, `alta_fecha`, `baja_fecha`, `empresa`, `sueldo`, `fecha_act_sueldo`, `vigen_hasta`.
+  - Para este caso se definió `aportante_tipo = 'T'`.
+- Se implementó el cambio en `backend/procedures/afi_afu_cuenta_ddjj.sql`.
+- Commit del cambio del SP:
+  - Revisión SVN: `8063`
+  - Archivo: `backend/procedures/afi_afu_cuenta_ddjj.sql`
+  - Comentario commit/tracking: `#29699 - Se separa actualizacion de derivacion y empresa de aportes`
+  - Se agregó el mismo comentario dentro del historial del SP para tracking.
+  - Validaciones ejecutadas: `svn update` previo OK, compilación NOEXEC contra DB OK, encoding UTF-8 sin BOM OK, finales CRLF preservados OK, sin `RTRIM`, sin `;`, working copy sin cambios pendientes.
+- Luego se documentó el cambio del SP en `redmine/29699/29699.md`.
+- Commit de documentación del cambio del SP:
+  - Revisión SVN: `8064`
+  - Archivo: `redmine/29699/29699.md`
+  - Comentario: `#29699 - Documenta cambio en afi_afu_cuenta_ddjj`
+- Se investigó dónde se utiliza el SP `afi_afu_cuenta_ddjj`.
+- Usos encontrados en PowerBuilder:
+  1. `exe/Source Infomedical/wp_cons_cuentas.srw`
+     - Línea aproximada 902: `DECLARE corrige_ddjj PROCEDURE FOR afi_afu_cuenta_ddjj`
+     - Se ejecuta en `wf_corrige_ddjj()` usando `dw_cuenta.object.cuit[1]`.
+  2. `exe/Source Infomedical/wp_cuentas.srw`
+     - Línea aproximada 380: `DECLARE corrige_ddjj PROCEDURE FOR afi_afu_cuenta_ddjj`
+     - Se ejecuta en `wf_corrige_ddjj()` usando CUIT de la cuenta.
+  3. `exe/Source Infomedical/wp_procesar_ddjj.srw`
+     - Línea aproximada 98: `DECLARE proceso_ddjj PROCEDURE FOR afi_afu_cuenta_ddjj`
+     - Se ejecuta en `ue_procesar()`.
+     - Puede llamar por lote, CUIT o CUIL.
+- Usos encontrados en DB:
+  - En `Test_Britanico`, búsqueda en `sys.sql_modules`: no se encontraron otros SPs, vistas, triggers o funciones que llamen a `afi_afu_cuenta_ddjj`.
+  - En scripts SQL del repo, fuera del propio archivo del SP, tampoco se encontraron referencias.
+- Rutas de menú para llegar a las ventanas PB que usan `afi_afu_cuenta_ddjj`, según `m_afilia.srm`:
+  1. `wp_cuentas`: **Empresas → Cuentas y subcuentas**
+     - Item `m_cargadecuentasysubcuentas`, texto `&Cuentas y subcuentas`.
+     - Abre `OpenSheet(wp_cuentas, wf_main_afi, 1, original!)`.
+  2. `wp_cons_cuentas`: **Empresas → Consultas → Ficha cuentas y subcuentas**
+     - Submenú `Consultas`, item `m_fichacuentasysubcuentas`.
+     - Abre `OpenSheet(wp_cons_cuentas, wf_main_afi, 1, original!)`.
+  3. `wp_procesar_ddjj`: **Empresas → Aportes → Obra social → Reproceso de DDJJ importadas**
+     - Submenú `Aportes`, submenú `Obra social`, item `m_procesar_ddjj`.
+     - Abre `OpenSheet(wp_procesar_ddjj, wf_main_afi, 1, original!)`.
+
+Notas de seguridad y continuidad:
+- No guardar ni repetir contraseñas, API keys ni secretos en respuestas o documentación.
+- Antes de seguir trabajando sobre `dgiuseppe-2026.05`, verificar estado SVN y actualizar la working copy si corresponde.
+- Mantener trazabilidad de cambios con prefijo `#29699 -` cuando el trabajo corresponda a ese Redmine.
+- Respetar las reglas SQL usadas en este entorno: no usar `RTRIM` y no finalizar sentencias SQL con `;`.
+
+## 2026-05-14 - Cambio a rama SVN dgiuseppe-2026.04 / Redmine 29699 etapa 2
+
+Resumen operativo de lo trabajado el 2026-05-14, para reutilizar más adelante:
+
+- Se cambió el foco de trabajo desde la rama SVN `dgiuseppe-2026.05` hacia una nueva working copy de etapa 2: `dgiuseppe-2026.04`.
+- Se ejecutó checkout SVN de la rama `Britanico/branches/2026.04` para el usuario SVN `dgiuseppe`.
+- La working copy quedó registrada operativamente como `dgiuseppe-2026.04` en `REPOSITORIOS.md`.
+- Ruta local de la working copy: `~/.openclaw/workspace/svn/dgiuseppe-2026.04`.
+- Remoto SVN: `https://srv-infosvn.infomedical.com/svn/Britanico/branches/2026.04`.
+- Config SVN local aislado: `~/.openclaw/workspace/.svn-auth/dgiuseppe-2026.04/config`.
+- Archivo de credenciales SVN aislado: `~/.openclaw/workspace/.svn-auth/dgiuseppe-2026.04/credentials.env`.
+- No guardar ni reproducir la contraseña SVN en memoria visible, respuestas ni documentación.
+- Validación del checkout de `dgiuseppe-2026.04`:
+  - `svn info` OK.
+  - `svn update` OK.
+  - `svn status` OK.
+  - Credencial SVN aislada usable OK.
+  - La rama quedó inicialmente en revisión `8075`.
+- En Redmine `29699`, se confirmó que el trabajo de estos cambios va directo a la rama de etapa 2 `2026.04`.
+- Se leyó Redmine `29699` usando la credencial Redmine registrada para el usuario `dgiuseppe`; no exponer ni copiar la API key.
+- Datos principales del Redmine 29699:
+  - Asunto: `E3 - Sps a modificar`.
+  - Proyecto: `Presupuestos Británico`.
+  - Tracker: `Tarea`.
+  - Estado observado: `Nuevo`.
+  - Módulo: `Afilmed - Facturación`.
+  - Producto: `Afilmed`.
+  - Origen: `Cliente`.
+  - Tiempo estimado desarrollo: `8`.
+- Interpretación del Redmine 29699 para esta etapa:
+  - Se deben adaptar objetos SQL por la separación de datos antes concentrados en `afi_deriv_aportes`.
+  - `afi_deriv_aportes` queda como tabla de derivación/aporte.
+  - `afi_deriv_empresas` concentra datos de empresa/CUIT/sueldo.
+  - Los SPs y queries que sigan usando `cuit`, `empresa`, `sueldo`, `fecha_act_sueldo` o `deriva` desde `afi_deriv_aportes` requieren revisión/corrección.
+- SPs listados por Redmine como modificación obligatoria:
+  - `afi_afi_aportes_recibidos`
+  - `afi_afu_cuenta_ddjj`
+  - `afi_afu_cuenta_trans`
+  - `afi_afu_deriv_apo_isss`
+  - `afi_aportes_ddjj`
+  - `afi_aportes_trans`
+  - `afi_fac_estado_cta_R1725`
+  - `afi_genera_aportes_estimados`
+  - `afi_import_batch`
+  - `afs_act_remuneracion`
+  - `afs_afiliados_x_cuenta_apor`
+  - `afs_afi_aportes`
+  - `afs_arma_aportes.sql`
+  - `afs_afi_aportes_meses_estim`
+  - `afs_afi_expor_afip`
+  - `afs_creden_provi`
+  - `afs_creden_x_esta`
+  - `afs_detalle_afiliados`
+  - `fs_detalle_padron_farma`
+  - `afs_det_afiliados_padron_prestad`
+  - `afs_impre_creden_provisoria`
+  - `afs_imp_gen_cred_provi`
+  - `afs_sind_apo_x_cta_periodo_ine`
+  - `afs_sind_periodos_adeudados`
+  - `afs_valida_valor_aportes`
+  - `afu_cod_oper_isss`
+  - `afu_isss_afiliados_salud`
+  - `afu_procesa_ddjj`
+  - `prs_hc_empresas_afi`
+- Otros SPs listados en Redmine para revisar por lógica, aunque no todos necesariamente requieren cambio:
+  - `afd_afiliados`
+  - `afd_afiliados_novedades_isss`
+  - `afi_afu_deriv_apo_isss`
+  - `afi_compro_impresion`
+  - `afi_moro_analisis_ddjj_tran`
+  - `afi_revertir_ajustes_aportes`
+  - `afs_afiliados_x_plan`
+  - `afs_afi_aportes_baja`
+  - `afs_afi_expor_crm`
+  - `afs_afi_expor_sss`
+  - `afs_arma_aportes`
+  - `afs_calcular_iibb_arba`
+  - `afs_calcular_iibb_caba`
+  - `afs_cons_deriv_aportes_sistema`
+  - `afs_creden_lista_expor`
+  - `afs_deriv_aportes`
+  - `afs_deriv_aportes_empresas`
+  - `afs_deriv_aportes_sistema_tot`
+  - `afs_detalle_padron_farma`
+  - `afs_iibb_alicuota_afi_cta`
+  - `afs_padron_de_bajas_afiliados`
+  - `afs_padron_morosos`
+  - `afs_padron_rnas_sss`
+  - `afs_padron_sss`
+  - `afu_afi_deriv_aportes_xsoli`
+  - `afu_cuentas`
+  - `afu_gen_credencial`
+  - `afu_reincorpora_afiliados`
+  - `afu_reprocesa_ddjj_sind`
+  - `afu_soli_abordar1`
+  - `ini_generate_t_reg_anssal`
+  - `ins_anssal_form070`
+  - `ins_anssal_form080`
+  - `ins_anssal_form331`
+  - `prs_calc_cant_afil_anssal`
+  - `prs_cons_droga_prest_recupero`
+- Se relevó en PowerBuilder cuántos objetos usan directamente `afi_deriv_aportes` en queries embebidas en la rama de trabajo anterior y se dejó registrado también en Redmine:
+  1. `wp_impor_aportes.srw` — SELECT directo; usa `cuit` y `deriva`.
+  2. `d_lst_afi_deriv_aportes_prn.srd` — DataWindow retrieve; usa columnas viejas `empresa`, `sueldo`, `cuit`, `deriva`.
+  3. `wp_impor_aportes_prepaga.srw` — SELECT directo.
+  4. `wp_imp_aportes_sind.srw` — SELECT directo.
+  5. `w_clase_auto.srw` — SELECT directo.
+  6. `wp_cuentas.srw` — SELECT directo.
+  7. `d_afi_aportes.srd` — DataWindow retrieve; tiene comentadas referencias viejas a `empresa`, `sueldo`, `cuit`, `deriva`.
+  8. `wr_subctas_sistema.srw` — SELECT directo.
+  9. `wp_soli_masivas.srw` — SELECT directo.
+  10. `wp_solici.srw` — SELECT directo; usa `cuit`, que ya no corresponde en `afi_deriv_aportes`.
+  11. `wp_abm_afi_aportes_real.srw` — SELECT directo; usa `cuit` y `deriva`.
+  12. `d_afi_aportes_soli.srd` — DataWindow retrieve; tiene comentadas referencias viejas y mantiene query directa contra `afi_deriv_aportes`.
+  - Nota: `d_afi_aportes_baja.srd` aparece como metadata/update table del DataWindow contra `afi_deriv_aportes`, pero no fue contado como query embebida porque no se detectó `retrieve`.
+- En `dgiuseppe-2026.04`, se actualizó la rama antes de documentar y quedó en revisión `8075`.
+- Se creó el documento `redmine/29699/29699.md` en la rama `dgiuseppe-2026.04`.
+- El documento `29699.md` consolidó:
+  - Datos del Redmine.
+  - SPs obligatorios a modificar.
+  - SPs a revisar por lógica.
+  - Objetos PowerBuilder detectados con uso directo de `afi_deriv_aportes`.
+  - Interpretación de `backend/tablas`.
+  - Criterios recomendados para ajuste.
+- Se interpretó la carpeta `backend/tablas` en `dgiuseppe-2026.04`:
+  - `extraccion-tables-definitions.sql`: query de extracción de metadata desde `sys.tables`, `sys.columns`, claves primarias y claves foráneas.
+  - `tables-definitions.csv`: exportación de estructuras con esquema, tabla, orden, campo, tipo, longitud, precisión, escala, nulabilidad, identidad, columna calculada, PK y FK.
+- Estructura relevante observada en `tables-definitions.csv`:
+  - `afi_deriv_aportes` tiene 13 columnas: `prepaga`, `contra`, `inte`, `vigen_desde`, `obra_soc`, `legajo`, `alta_fecha`, `baja_fecha`, `vigen_hasta`, `meses_a_estimar`, `inte_titular`, `sistema`, `aportante_tipo`.
+  - `afi_deriv_empresas` tiene 11 columnas: `prepaga`, `contra`, `inte`, `vigen_desde`, `cuit`, `alta_fecha`, `baja_fecha`, `empresa`, `sueldo`, `fecha_act_sueldo`, `vigen_hasta`.
+  - `soli_deriv_aportes` mantiene información de derivación asociada a solicitudes e incluye `aportante_tipo`, `inte_titular`, `sistema`, `estima` y `cant`.
+  - `soli_deriv_aportes_empresas` concentra información de empresa asociada a solicitudes: `cuit`, `empresa`, `sueldo` y vigencias.
+  - `tmp_afi_deriv_aportes` conserva una estructura compatible con el formato anterior, incluyendo `empresa`, `sueldo`, `deriva` y `cuit`.
+- Riesgo técnico principal documentado:
+  - Como `cuit` forma parte de la clave de `afi_deriv_empresas`, un join desde `afi_deriv_aportes` hacia `afi_deriv_empresas` solo por `prepaga`, `contra`, `inte` y `vigen_desde` puede duplicar filas si existe más de una empresa/CUIT para la misma vigencia.
+- Criterios técnicos recomendados documentados:
+  - Separar lógica de derivación y lógica de empresa.
+
+## 2026-06-17 - Onboarding operativo Daniel Acosta / GitLab / SVN / Redmine
+
+Resumen operativo de la sesión con Daniel Acosta (`d.acosta@infomedical.com.ar`) para reutilizar más adelante:
+
+- Interlocutor identificado por OpenClaw: `Daniel Acosta`; usar `Daniel` al dirigirse a él.
+- Se registró credencial Redmine local para el usuario `d.acosta`.
+  - Archivo: `~/.openclaw/secrets/redmine/d.acosta.env`.
+  - Permisos validados: `600`.
+  - No guardar ni reproducir API key en memoria visible, respuestas ni documentación.
+- Se creó el archivo solicitado por Daniel:
+  - Ruta: `/mnt/Agentes/Daniel/daniel.txt`.
+  - Contenido: `hola soy nuevo con el chat`.
+  - Validación: texto `us-ascii`, sin BOM, finales de línea `LF`.
+- Se generó llave SSH Ed25519 dedicada para GitLab de Daniel.
+  - Privada: `~/.ssh/id_ed25519_gitlab_d_acosta`.
+  - Pública: `~/.ssh/id_ed25519_gitlab_d_acosta.pub`.
+  - Comentario de la clave: `d.acosta@gitlab`.
+  - Permisos validados: privada `600`, pública `644`.
+  - GitLab validó la autenticación con esa llave como `@ext_daacosta`.
+  - No guardar ni exponer la clave privada.
+- Repositorios Git registrados y disponibles:
+  - `smg-code-afilmed`: `~/.openclaw/workspace/git/smg-code-afilmed`, remoto `git@gitlab.com:smg-code/afilmed/afilmed.git`, branch local `main`.
+  - `smg-code-presmed`: `~/.openclaw/workspace/git/smg-code-presmed`, remoto `git@gitlab.com:smg-code/presmed-medico/presmed.git`.
+- En `smg-code-presmed`:
+  - Se hizo switch desde `main` a la rama `TAREA_29420_MODULO_FARMACIA`.
+  - La rama local quedó trackeando `origin/TAREA_29420_MODULO_FARMACIA`.
+  - El primer `git pull` falló por `Permission denied (publickey)` porque Git no seleccionaba la llave de Daniel automáticamente.
+  - Se validó la llave `~/.ssh/id_ed25519_gitlab_d_acosta` contra GitLab y luego se ejecutó el pull usando `GIT_SSH_COMMAND` con esa llave.
+  - Pull completado por fast-forward.
+  - Último commit observado después del pull: `fd08d68 ajuste para que tome una lista de opciones de entidades con un renglon vacio.`
+  - Estado final observado: rama alineada con `origin/TAREA_29420_MODULO_FARMACIA`, working tree limpio.
+  - Para futuras operaciones contra GitLab de Daniel, usar explícitamente la llave `~/.ssh/id_ed25519_gitlab_d_acosta` si no se configura `~/.ssh/config`.
+- Se intentó usar la skill `git-clone` para `git@gitlab.com:smg-code/presmed-medico/presmed.git`, pero se abortó porque la carpeta calculada `~/.openclaw/workspace/git/smg-code-presmed` ya existía y el repo ya estaba registrado.
+- Rama Git remota relevante confirmada en `smg-code-presmed`:
+  - `origin/TAREA_29420_MODULO_FARMACIA`.
+- Se registró por skill `svn-checkout` la rama SVN:
+  - Nombre lógico: `Infomedical.lcamaratta-FIX-193-deb-mas-integ-20260428`.
+  - Ruta local: `~/.openclaw/workspace/svn/Infomedical.lcamaratta-FIX-193-deb-mas-integ-20260428`.
+  - Remoto: `http://lv36papf-svncorp.swm.com.ar:8888/svn/swiss/mp/prod/base_de_datos/sybase/sybase-DB1/sybase-prestaci/DDL/branches/FIX-193-deb-mas-integ-20260428`.
+  - Usuario SVN asociado: `Infomedical.lcamaratta`.
+  - Config SVN local: `~/.openclaw/workspace/.svn-auth/Infomedical.lcamaratta-FIX-193-deb-mas-integ-20260428/config`.
+  - Archivo credenciales SVN: `~/.openclaw/workspace/.svn-auth/Infomedical.lcamaratta-FIX-193-deb-mas-integ-20260428/credentials.env`.
+  - Validaciones realizadas: `svn info` OK, `svn update` OK, `svn status` OK, credencial SVN aislada OK, `REPOSITORIOS.md` actualizado OK.
+  - Revisión observada: `1880326`.
+- Se registró por skill `svn-checkout` la rama SVN:
+  - Nombre lógico: `Infomedical.lcamaratta-PRS-3850-Reingenieria-LiqFarmacias_20260603`.
+  - Alias corto acordado con Daniel: `PRS-3850-DB`.
+  - Variable técnica sugerida para scripts/comandos: `PRS_3850_DB`.
+  - Ruta local: `~/.openclaw/workspace/svn/Infomedical.lcamaratta-PRS-3850-Reingenieria-LiqFarmacias_20260603`.
+  - Remoto: `http://lv36papf-svncorp.swm.com.ar:8888/svn/swiss/mp/prod/base_de_datos/sybase/sybase-DB1/sybase-prestaci/DDL/branches/PRS-3850-Reingenieria-LiqFarmacias_20260603`.
+  - Usuario SVN asociado: `Infomedical.lcamaratta`.
+  - Config SVN local: `~/.openclaw/workspace/.svn-auth/Infomedical.lcamaratta-PRS-3850-Reingenieria-LiqFarmacias_20260603/config`.
+  - Archivo credenciales SVN: `~/.openclaw/workspace/.svn-auth/Infomedical.lcamaratta-PRS-3850-Reingenieria-LiqFarmacias_20260603/credentials.env`.
+  - Validaciones realizadas: `svn info` OK, `svn update` OK, `svn cleanup` OK, `svn status` OK, credencial SVN aislada OK, `REPOSITORIOS.md` actualizado OK.
+  - Revisión observada: `1880326`.
+- Para operaciones SVN futuras sobre esas working copies, usar siempre el `Usuario SVN asociado`, el `Config SVN local` y el `Archivo credenciales SVN` registrados en `REPOSITORIOS.md`; no usar el cache SVN global.
+- No guardar ni reproducir contraseñas SVN en memoria visible, respuestas ni documentación.
+- Profiles DB disponibles consultados para Daniel:
+  - SQL Server: `InstallQA_89`, `PruebasCoreINFOMEDICAL`, `Test_Britanico`, `prevencion_entrega`, `Britanico_Prod`.
+  - Sybase ASE: `SwissQAP10_afilmed`, `SwissQAP10_prestaci`, `SwissDeVP10_afilmed`, `SwissDeVP10_prestaci`.
+  - Reemplazar accesos a `afi_deriv_aportes.cuit`, `afi_deriv_aportes.empresa`, `afi_deriv_aportes.sueldo`, `afi_deriv_aportes.fecha_act_sueldo` y `afi_deriv_aportes.deriva`.
+  - Usar `afi_deriv_empresas` para datos de CUIT, empresa y sueldo.
+  - Revisar joins para evitar duplicación de filas por múltiples CUITs.
+  - Respetar vigencias con `vigen_desde`, `vigen_hasta` y `baja_fecha`.
+  - Considerar solo registros vigentes por defecto cuando exista `baja_fecha`.
+  - En scripts SQL de este entorno: no usar `RTRIM` y no finalizar sentencias SQL con `;`.
+- Se validó el documento nuevo:
+  - UTF-8 sin BOM OK.
+  - Finales de línea LF OK.
+  - Contenido clave presente: `afi_deriv_aportes`, `afi_deriv_empresas`, SPs indicados, objetos PowerBuilder, `backend/tablas`.
+- Se ejecutó `svn add` y commit del documento `redmine/29699/29699.md` en `dgiuseppe-2026.04`.
+- Commit realizado:
+  - Revisión SVN: `8076`.
+  - Archivo: `redmine/29699/29699.md`.
+  - Comentario: `#29699 - Documenta interpretacion inicial de etapa 2`.
+  - Validación: `svn commit` OK, `svn status` sin cambios pendientes, `svn info` del archivo confirma revisión `8076`.
+
+Notas de continuidad para mañana:
+- Retomar sobre repo `dgiuseppe-2026.04`, no sobre `dgiuseppe-2026.05`, salvo pedido explícito.
+- Antes de seguir, verificar `svn status` y hacer `svn update` usando las credenciales/config SVN aisladas registradas para `dgiuseppe-2026.04`.
+- Mantener trazabilidad con prefijo `#29699 -` para commits y comentarios internos relacionados con este Redmine.
+- No hacer commit/push/SVN commit salvo pedido explícito del humano en la intervención puntual.
+- No exponer credenciales SVN, contraseñas ni API keys Redmine.
+- Si se modifican SQL, respetar reglas del entorno: sin `RTRIM` y sin `;` final.
+- Para análisis funcional/técnico, distinguir evidencia, hipótesis y recomendación.
+## 2026-05-15 - Relevamiento campo financiero en ABM Tipos de Comprobantes
+
+Resumen operativo de lo trabajado el 2026-05-15, para reutilizar más adelante:
+
+- El humano consultó por el campo/columna `financiero` del ABM de Tipos de Comprobantes y pidió identificar en qué otros lugares se utiliza.
+- Contexto operativo usado para el relevamiento:
+  - Rama/foco de trabajo: `dgiuseppe-2026.04`.
+  - También se comparó contra `dgiuseppe-2026.05`; las referencias encontradas al campo `financiero` fueron iguales en ambas ramas.
+  - Profile de referencia: `Test_Britanico`.
+- Se confirmó que el campo `compro_tipos.financiero` distingue comprobantes financieros (`S`) de no financieros (`N`).
+- Uso funcional principal observado: la mayoría de los procesos filtran comprobantes no financieros con `financiero = 'N'`.
+- Objetos del ABM de Tipos de Comprobantes donde se usa el campo:
+  - `exe/Source Infomedical/wp_compro_tipos.srw`: valida que el campo esté informado y lo envía en alta/modificación.
+  - `exe/Source Infomedical/d_compro_tipos.srd`: DataWindow de edición del ABM.
+  - `exe/Source Infomedical/d_lista_compro_tipos.srd`: lista del ABM, muestra el valor del campo.
+  - `backend/procedures/afi_compro_tipos.sql`: alta de tipo de comprobante.
+  - `backend/procedures/afu_compro_tipos.sql`: modificación de tipo de comprobante.
+- DataWindows / combos donde el campo se expone o filtra:
+  - `exe/Source Infomedical/dd_compro_tipo.srd`: filtra `compro_tipos.financiero = 'N'`.
+  - `exe/Source Infomedical/dd_compro_tipos_no_finan.srd`: filtra `financiero = 'N'`.
+  - `exe/Source Infomedical/dd_compro_tipo2.srd`: expone `financiero`.
+  - `exe/Source Infomedical/dd_compro_tipo_tc.srd`: expone `financiero`.
+  - `exe/Source Infomedical/dddw_compro_tipos_union_todos.srd`: incluye `financiero`.
+  - `backend/procedures/afs_compro_tipos_union_todos.sql`: devuelve `financiero`.
+- Pantallas PowerBuilder con filtros explícitos por comprobantes no financieros:
+  - `exe/Source Infomedical/wp_reversion_comprobantes.srw`: `financiero = 'N'`.
+  - `exe/Source Infomedical/wr_ajustes_gen_comprob.srw`: `financiero = 'N'`.
+  - `exe/Source Infomedical/wr_ajustes_empre_gen_comprob.srw`: `financiero = 'N'`.
+  - `exe/Source Infomedical/wr_ajustes_gen_comprob_masivo_lotes.srw`: filtra por `debi_credi` y `financiero = 'N'`.
+- Procedimientos SQL donde el campo impacta funcionalmente:
+  - `backend/procedures/afi_puntos_cae_test.sql`: considera comprobantes legales no financieros.
+  - `backend/procedures/afs_comision_promotores.sql`: distingue comprobantes no financieros y financieros en cálculo de comisiones.
+  - `backend/procedures/afi_fac_estado_cta_R1725.sql`: filtra comprobantes no financieros.
+  - `backend/procedures/afs_cance_saldos.sql`: usa no financieros para cancelación de saldos.
+  - `backend/procedures/afs_entes_puntos_compro_numero.sql`: considera legales no financieros.
+  - `backend/procedures/afs_exportar_iibb.sql`: exporta legales no financieros.
+  - `backend/procedures/afu_comprobante_anula.sql`: condiciona lógica de solicitudes cuando el comprobante no es financiero.
+  - `backend/procedures/afs_lst_libro_iva.sql`: Libro IVA filtra legales no financieros.
+  - `backend/procedures/afs_reversion_masiva.sql`: reversión masiva filtra no financieros.
+- Se preparó un informe para subir a Redmine con la conclusión:
+  - El campo `financiero` no es solo informativo del ABM.
+  - Modificarlo puede afectar selección de tipos de comprobantes en pantallas, generación de ajustes, reversión de comprobantes, procesos CAE/puntos, Libro IVA, exportación IIBB, cancelación de saldos, comisiones y anulación de comprobantes/solicitudes asociadas.
+- El humano preguntó en qué profile se estaba trabajando: se respondió que el profile de referencia era `Test_Britanico`, aclarando que no había una conexión DB abierta permanente.
+- El humano pidió listar `compro_tipos`; como no había cliente SQL disponible en el entorno (`sqlcmd`, `tsql`, módulos Python/Node relevantes no disponibles), se respondió con los datos previamente verificados en memoria para `Test_Britanico`.
+- Tipos de comprobantes vigentes conocidos en `Test_Britanico`:
+  - `CI` / Interno / Crédito Inicial
+  - `DC` / Interno / Documento Interno Cred
+  - `DI` / Interno / Documento Interno Deb
+  - `FC` / Legal / Factura
+  - `NC` / Legal / Nota de Crédito
+  - `ND` / Legal / Nota de Débito
+  - `RC` / Legal / Recibo
+  - `RS` / Interno / Resumen de Cuenta
+  - `SI` / Interno / Saldo Inicial
+- El humano preguntó en qué rama se estaba trabajando: se respondió `dgiuseppe-2026.04`; el relevamiento fue comparado también contra `dgiuseppe-2026.05`.
+
+Notas de continuidad:
+- Retomar sobre repo `dgiuseppe-2026.04`, salvo pedido explícito distinto.
+- Para futuras consultas DB sobre `Test_Britanico`, recordar que en esta sesión no se encontró cliente SQL disponible en PATH ni módulos Python/Node habituales para conectar directo.
+- Si se requiere listar datos actuales de DB, primero validar disponibilidad de herramienta/cliente de conexión o instalar/configurar un método autorizado por el humano.
+- No exponer credenciales ni secretos de DB/SVN/Redmine en respuestas o documentación.
+
+## 2026-05-19 - Norma / Redmine 29793 / Logo credenciales provisorias
+
+Resumen operativo de lo trabajado el 2026-05-19, para reutilizar más adelante:
+
+- Interlocutora identificada por contenido explícito como Norma.
+- Se registró credencial Redmine para el usuario ngaguero. La API key no debe exponerse ni copiarse en documentación.
+- Norma pidió analizar el Redmine 29793 usando credenciales ngaguero y comparar, si hacía falta, contra la aplicación en el repositorio dgiuseppe-2026.04.
+- Redmine 29793:
+  - Título: Cambio de logo en credenciales provisorias (Azure 23890).
+  - Proyecto: Soporte Británico.
+  - Estado al momento del análisis: En Análisis.
+  - Módulo: Afilmed - Credenciales.
+  - Versión informada: 2026.03.
+  - Estimación cargada: 8 hs.
+- Adjuntos analizados:
+  - clipboard-202605151524-qfhje.png: captura de credencial provisoria actual con logo viejo HOB Plan de Salud | Hospital Británico.
+  - logoHB-2026.png: logo nuevo solicitado, banner horizontal Plan de Salud HOB | Medicina Prepaga, PNG de 938 x 57 con canal alfa.
+- Repositorio usado para contraste aplicativo:
+  - dgiuseppe-2026.04.
+  - La working copy estaba sin cambios pendientes al inicio del relevamiento.
+- Conclusión técnica principal:
+  - La credencial provisoria no toma el logo desde un archivo fijo versionado.
+  - El DataWindow de credencial usa el subreporte d_logo.
+  - d_logo lee el logo desde dbo.logos filtrando por prepaga.
+  - El BLOB mostrado es dbo.logos.logo.
+- Flujo PowerBuilder relevado para credenciales provisorias:
+  - Menú de generación: Credenciales -> Generación de credenciales provisorias.
+  - m_afilia.srm abre wp_gene_crede_provi.
+  - wp_gene_crede_provi.srw gestiona generación/reimpresión de credenciales provisorias.
+  - Para PDF llama a gf_impre_creden_prov_pdf.
+  - gf_impre_creden_prov_pdf.srf usa lds_creden.DataObject = d_cred_prn_pdf.
+  - d_cred_prn_pdf.srd contiene un subreporte dataobject d_logo al que le pasa prepaga.
+  - La impresión no PDF usa d_cred_prn u otras variantes, también con d_logo.
+- Opción de aplicativo para subir el logo:
+  - Módulo/menú: Utiles -> Sube Logo.
+  - Archivo de menú: exe/Source Infomedical/m_mainutil.srm.
+  - Evento: opensheet(w_sube_logo,wf_mainutil, 1, original!).
+  - Ventana: exe/Source Infomedical/w_sube_logo.srw.
+  - La ventana permite trabajar con Entes o Prepagas; para este caso corresponde Prepagas.
+  - Botón Cargar Imagen: usa filtro de archivos BMP.
+  - Botón Grabar: para prepagas ejecuta UPDATEBLOB logos SET logo = :Emp_id_pic WHERE prepaga = :li_prepaga.
+  - Botón Traer Imagen: lee SELECTBLOB logo FROM logos WHERE prepaga = :li_prepaga.
+- Consulta DB realizada contra profile Test_Britanico:
+  - No había cliente SQL Server disponible inicialmente.
+  - Se creó un entorno temporal en /tmp/oc_sqlclient_29793.
+  - pymssql instaló pero falló por transporte contra 172.16.10.110.
+  - Se validó que el puerto TCP 1433 respondía.
+  - Se instaló python-tds en el entorno temporal y con pytds la conexión fue OK.
+  - Tabla consultada: dbo.logos.
+  - Estructura: prepaga smallint NOT NULL, PK/FK a dbo.prepagas(prepaga); logo image NULL, BLOB del logo.
+  - Contenido observado: un solo registro, prepaga = 1, denominación PSHB, logo con BLOB de 116224 bytes.
+- Impacto transversal encontrado:
+  - Actualizar dbo.logos.logo para prepaga = 1 no impacta solo credenciales provisorias.
+  - Se encontraron 56 DataWindows que consumen d_logo o variantes que leen dbo.logos.
+  - Grupos impactados: credenciales, bonos/órdenes/autorizaciones, ambulatorio/domicilio, facturación/comprobantes, liquidaciones/reintegros, solicitudes/subsidios.
+- Objetos consumidores principales relevados:
+  - Credenciales: d_cred_prn.srd, d_cred_prn_pdf.srd, d_cred_prn_cine.srd, d_cred_prn_ospelsym.srd, d_cred_celer_prn.srd.
+  - Bonos/órdenes/autorizaciones: d_imp_bono.srd, d_imp_bono1.srd, d_imp_bono_consfarma_cine.srd, d_imp_bono_ospegap.srd, dc_orden_afi1.srd a dc_orden_afi7.srd, dc_orden_anes.srd, dc_orden_ciru.srd, dc_orden_ciru2.srd, dc_orden_domi.srd, dc_orden_excep.srd, dc_orden_prestac.srd, dc_orden_prestad.srd, dc_orden_prestad_2.srd, dc_orden_prestad_3.srd, dc_orden_sana1.srd a dc_orden_sana5.srd, dc_orden_situ*.srd.
+  - Ambulatorio/domicilio: dc_ambu_pedido_prn.srd, dc_ambu_pedido_solicitud_prn.srd, dc_domi_farma.srd, dc_domi_segui.srd.
+  - Facturación/comprobantes: d_factura.srd, dc_factu_indebido_detalle.srd, dc_factu_indebido_detalle_compro.srd.
+  - Liquidaciones/reintegros: dc_liqui_recep.srd, d_lst_rein_ciru_cmp.srd, d_lst_rein_ciru_compro.srd, d_lst_rein_ciru_compro2.srd, d_lst_rein_farma.srd, d_lst_rein_farma_compro.srd, d_lst_rein_prestac_cmp.srd, d_lst_rein_prestac_cmp_sin_sal.srd, d_lst_rein_prestac_compro.srd, dw_rei_nota.srd, dw_rei_ord_prn_compo.srd.
+  - Solicitudes/subsidios: dc_solici.srd, dc_planilla_subsidio.srd.
+- Recomendación dada:
+  - Confirmar si el nuevo logo debe aplicar globalmente a todos los documentos de PSHB o solo a credenciales provisorias.
+  - Si aplica globalmente: actualizar controladamente dbo.logos.logo para prepaga = 1, validando formato compatible con PowerBuilder/OLE y documentos representativos.
+  - Si aplica solo a credenciales provisorias: no tocar globalmente dbo.logos.logo; aislar el cambio en los DataWindows de credencial o en una fuente específica.
+- Entregables generados durante la conversación:
+  - Se creó Redmines/29793/analisis_redmine_29793.pdf.
+  - Primera versión: 3 páginas.
+  - Norma pidió rehacerlo con más detalle, agregar opción de aplicativo/menú para subir logo y grilla vertical de objetos impactados.
+  - Segunda versión: 5 páginas, enviada por Discord como adjunto.
+  - Envío final registrado por Discord con message id 1506374774685962442.
+- Limpieza posterior:
+  - Norma pidió borrar la carpeta Redmines/29793.
+  - Se aplicaron dos confirmaciones por tratarse de eliminación de carpeta.
+  - Se borró únicamente Redmines/29793.
+  - Validación posterior: BORRADO_OK.
+- Notas de continuidad:
+  - No se realizaron cambios en SVN ni en base de datos.
+  - No exponer API key Redmine, credenciales DB ni token Discord.
+  - Si se retoma implementación, pedir definición funcional del alcance del logo: global PSHB vs solo credenciales provisorias.
+  - Si se necesita volver a consultar Test_Britanico, puede reutilizarse el enfoque temporal con pytds o instalar/configurar un cliente autorizado.
+
+## 2026-05-20 - Pedido de persistencia de memoria operativa
+
+Resumen operativo para continuidad:
+
+- Interlocutor indicado por el contexto del mensaje: Diego / usuario operativo `dgiuseppe_info`.
+- Diego pidió: "guardá en tu memoria permanente, todo lo visto".
+- Se ejecutó el bootstrap operativo de la sesión antes de intervenir memoria.
+- Queda ratificado como memoria permanente vigente todo el contexto operativo ya documentado en este archivo hasta esta fecha.
+- Continuidad acumulada relevante:
+  - Trabajo sobre Redmine 29699 en ramas SVN `dgiuseppe-2026.05` y `dgiuseppe-2026.04`, con análisis funcional/técnico de separación entre `afi_deriv_aportes` y `afi_deriv_empresas`.
+  - Cambio ya realizado y documentado sobre el SP `afi_afu_cuenta_ddjj` para separar datos de derivación y datos de empresa, con trazabilidad `#29699`.
+  - Relevamiento de usos PowerBuilder del SP `afi_afu_cuenta_ddjj` y rutas de menú asociadas.
+  - Trabajo posterior sobre Redmine 29793, análisis del logo de credenciales provisorias, origen del logo en `dbo.logos.logo`, menú aplicativo `Utiles -> Sube Logo`, impacto transversal sobre DataWindows y recomendación de confirmar alcance global vs credenciales provisorias.
+  - Se registran como restricciones de continuidad: no exponer credenciales, API keys, passwords, tokens ni secretos; antes de operar sobre SVN o Redmine usar las credenciales registradas correspondientes; antes de cambios destructivos aplicar confirmación reforzada.
+- No se realizaron cambios de código, SVN, base de datos ni publicaciones como parte de este pedido.
+
+## 2026-05-20 - Redmine 29699 / dgiuseppe-2026.04 / análisis de consumos de SPs
+
+Resumen operativo para continuidad:
+
+- Interlocutor indicado por el contexto del mensaje: Diego / usuario operativo `dgiuseppe_info`.
+- Rama/working copy usada para el análisis: `dgiuseppe-2026.04`.
+- Redmine trabajado: `29699`.
+- Pedido principal:
+  - Analizar desde dónde se consumen/ejecutan SPs indicados en el Redmine 29699.
+  - Considerar llamadas desde PowerBuilder, DataWindows, otros stored procedures, jobs/scripts SQL y recursividad hasta raíz inicial cuando aplique.
+  - Incluir aplicativo y ruta de menú cuando el llamado venga de PB.
+  - Si no existe ruta de menú, indicar evento, función, bloque o contexto `DataWindow retrieve/SQL` cuando pueda detectarse por búsqueda estática.
+  - Indicar explícitamente SPs sin consumo/ejecución detectada.
+- Primer documento acotado para Diego:
+  - Archivo local final: `redmine/29699/sps_diego_29699.md`.
+  - Derivado de la lista obligatoria/acotada de 28 SPs.
+  - Corrección aplicada: el nombre erróneo `fs_detalle_padron_farma` fue corregido a `afs_detalle_padron_farma`.
+  - Se numeraron los llamados detectados en las columnas: "Desde dónde se consume/ejecuta", "Aplicativo" y "Ruta de menú / recursividad".
+  - Se agregaron dobles saltos HTML (`<br><br>`) entre ítems numerados para mejorar lectura en Redmine.
+  - Se generó Excel local: `redmine/29699/sps_diego_29699.xlsx`.
+  - Validación del Excel Diego: formato XLSX válido, 28 filas de datos.
+- Segundo documento para Walter:
+  - Archivo local final: `redmine/29699/sps_walter_29699.md`.
+  - Derivado de la segunda lista de 36 SPs "a revisar".
+  - Se numeraron los llamados detectados en las columnas: "Desde dónde se consume/ejecuta", "Aplicativo" y "Ruta de menú / recursividad".
+  - Se agregaron dobles saltos HTML (`<br><br>`) entre ítems numerados para mejorar lectura en Redmine.
+  - Se generó Excel local: `redmine/29699/sps_walter_29699.xlsx`.
+  - Validación del Excel Walter: formato XLSX válido, 36 filas de datos.
+- Otros archivos generados durante iteraciones previas:
+  - `redmine/29699/consumos_sps_29699.md`: primer análisis amplio de 63 SPs.
+  - `redmine/29699/consumos_sps_solicitados_29699.md`: base anterior del listado Diego.
+  - `redmine/29699/consumos_sps_solicitados_29699.pdf`: conversión PDF previa, 7 páginas.
+  - `redmine/29699/consumos_sps_a_revisar_29699.md`: base anterior del listado Walter.
+  - `redmine/29699/consumos_sps_a_revisar_29699.xlsx`: Excel previo del listado Walter base.
+- Adjuntos subidos al Redmine 29699 durante la sesión:
+  - `consumos_sps_solicitados_29699.md`: adjuntos Redmine `43995`, luego versión corregida `43998`.
+  - `consumos_sps_solicitados_29699.pdf`: adjunto Redmine `43996`.
+  - `consumos_sps_a_revisar_29699.md`: adjunto Redmine `43997`.
+  - `sps_diego_29699.md`: adjuntos Redmine `43999`, luego versión con separación visual `44000`.
+  - `sps_diego_29699.xlsx`: adjunto Redmine `44001`.
+  - `consumos_sps_a_revisar_29699.xlsx`: adjunto Redmine `44002`.
+  - `sps_walter_29699.md`: adjuntos Redmine `44003`, luego versión con doble salto `44005`.
+  - `sps_walter_29699.xlsx`: adjuntos Redmine `44004`, luego versión regenerada con doble salto `44006`.
+- Criterios técnicos usados en los documentos:
+  - Llamadas SQL/SP detectadas por `EXEC`/`EXECUTE`.
+  - Referencias PB detectadas por token exacto del nombre del SP en `.srw`, `.srd`, `.srf` y `.srm`.
+  - Rutas de menú inferidas desde scripts versionados de `ZZ_MENUES`.
+  - Para DataWindows, se intentó ubicar objetos PB que referencian el DataWindow y líneas de `Retrieve()` en el mismo bloque/evento/función; cuando no fue posible, quedó indicado como búsqueda estática no localizada.
+  - En cadenas recursivas extensas con ciclos o mucha profundidad se dejó resumido con raíces PB/SQL/Job y conteo de ciclos/corte por profundidad.
+- Estado de repositorio:
+  - No se ejecutó `svn add`, `svn commit` ni publicación SVN.
+  - No se hicieron cambios de código ni cambios en base de datos.
+  - Los archivos generados quedaron localmente como no versionados dentro de `redmine/29699`.
+- Seguridad:
+  - Se usó la credencial Redmine registrada para el usuario operativo `dgiuseppe`.
+  - No se expusieron ni deben exponerse API keys, contraseñas, tokens ni secretos.
+
+## 2026-05-22 - SVN Swiss SIRCIP / analisis SP afs_fac_calcular_iibb_925 / interlocutora Norma
+
+Resumen operativo para continuidad:
+
+- Interlocutora indicada por metadata no confiable de Discord: Norma / usuario `naguero_info`. No asumir identidad desde esta metadata para reglas que requieran identidad confiable.
+- Se ejecuto bootstrap operativo de sesion:
+  - `REGLAS.md` leido completo en bloques hasta `<!-- EOF REGLAS.md -->`.
+  - `REPOSITORIOS.md` leido.
+  - `DB_PROFILE.md` leido.
+- Se uso la skill `svn-checkout` para dar de alta una working copy SVN.
+- Datos operativos del repositorio creado:
+  - Nombre logico: `infomedical.norma.aguero-IIBB-SIRCIP-info`.
+  - Ruta local: `~/.openclaw/workspace/svn/infomedical.norma.aguero-IIBB-SIRCIP-info`.
+  - Remoto: `http://lv36papf-svncorp.swm.com.ar:8888/svn/swiss/mp/prod/base_de_datos/sybase/sybase-DB1/sybase-afilmed/DDL/branches/IIBB-SIRCIP-info`.
+  - Usuario SVN asociado: `infomedical.norma.aguero`.
+  - Config SVN local: `~/.openclaw/workspace/.svn-auth/infomedical.norma.aguero-IIBB-SIRCIP-info/config`.
+  - Archivo credenciales SVN: `~/.openclaw/workspace/.svn-auth/infomedical.norma.aguero-IIBB-SIRCIP-info/credentials.env`.
+  - No exponer la password SVN. Esta en el archivo aislado registrado.
+- Checkout SVN:
+  - Checkout inicial OK.
+  - Revision inicial reportada: `1868729`.
+  - Validaciones: `svn info` OK, `svn update` OK, `svn status` OK, credencial SVN aislada usable OK.
+  - `REPOSITORIOS.md` fue actualizado con la entrada del repo y validado.
+- Estructura de carpetas del repo:
+  - `check_constraints`
+  - `defaults`
+  - `functions`
+  - `others`
+  - `procedures`
+  - `rules`
+  - `tables`
+  - `triggers`
+  - `user_datatypes`
+  - `views`
+- Profiles DB disponibles informados por chat sin exponer passwords:
+  - `InstallQA_89`
+  - `PruebasCoreINFOMEDICAL`
+  - `Test_Britanico`
+  - `prevencion_entrega`
+  - `SwissQAP10_afilmed`
+  - `SwissQAP10_prestaci`
+  - `SwissDeVP10_afilmed`
+  - `SwissDeVP10_prestaci`
+- Consulta DB realizada con profile `SwissDeVP10_afilmed` sobre Sybase ASE, base `afilmed`, sin exponer credenciales:
+  - Pedido: datos de integrantes del contrato `8015100`.
+  - Consulta principal sobre `V_Afiliados`, con joins a `parentescos` y `baja_motivos`.
+  - Vigentes encontrados:
+    - Inte `01`: `ESTRADA FEDERICO SANTIAGO`, DU `17318376`, CUIL `20173183764`, parentesco `Titular`, nacimiento `1964-12-16`, estado civil `C`.
+    - Inte `02`: `GOMEZ SILVIA ROSANA`, DU `20428466`, CUIL `27204284666`, parentesco `Conyuge`, nacimiento `1968-09-24`, estado civil `C`.
+    - Inte `05`: `ESTRADA SANTIAGO`, DU `44998559`, CUIL `20449985592`, parentesco `Hijo`, nacimiento `2003-06-19`, estado civil `S`.
+  - No vigentes encontrados:
+    - Inte `03`: `ESTRADA DELFINA`, DU `41640378`, baja `2021-05-01`, motivo `SE VA DEL PAIS`.
+    - Inte `04`: `ESTRADA BELEN`, DU `43031086`, baja `2023-12-01`, motivo `NO DA MOTIVO`.
+- Update SVN posterior:
+  - Repo actualizado a revision `1868731`.
+  - Archivos nuevos recibidos:
+    - `procedures/afi_afiliados_iibb_SIRCIP.sql`
+    - `procedures/afi_iibb_SIRCIP_soli.sql`
+    - `procedures/afs_fac_calcular_iibb_925.sql`
+    - `tables/PERCEPSIRCIP.sql`
+  - Tambien se actualizaron varios scripts de `procedures/` y `tables/`.
+  - `svn status` quedo sin salida, sin cambios locales pendientes.
+- Analisis de `procedures/afs_fac_calcular_iibb_925.sql`:
+  - SP de calculo de percepcion IIBB para jurisdiccion/codigo `925`, asociado a SIRCIP/Santa Fe segun comentarios.
+  - Carga registros en `#FAC_COMPRO_PERCEP_IIBB`; no calcula el importe final directamente.
+  - Busca configuracion vigente en `IB_PROVINCIAS_CONFIG` para `@prm_ente` y `codigo_juris = 925`.
+  - Usa `PERCEPSIRCIP` como padron y matchea por `DCT.cuit_doc`.
+  - Riesgos detectados antes de leer la transcripcion:
+    - El SP referencia `PIA.vigen_hasta` y `PIA.tipo_contrib`, pero `tables/PERCEPSIRCIP.sql` no contiene esas columnas.
+    - Se verifico tambien en `SwissDeVP10_afilmed`: `PERCEPSIRCIP` real existe y tiene 10 columnas, sin `vigen_hasta` ni `tipo_contrib`.
+    - `@con_socio_sin_iibb_tipo` esta declarado pero no inicializado; en SPs similares suele valer `19`.
+    - El segundo insert tiene comentado el filtro por provincia/jurisdiccion y puede aplicar fallback general a todos los contratos.
+    - Falta considerar `PERCEPSIRCIP.jurisdiccion` para evitar tomar un registro incorrecto por solo matchear CUIT.
+- Documento/transcripcion leida:
+  - Ruta: `/mnt/Agentes/Norma/ANALISIS/ARCA_SIRCIP/SIRCIP - Relevamiento y estimación..docx`.
+  - Se extrajo texto con `pandoc`.
+  - No se modifico el SP.
+- Interpretacion funcional desde la transcripcion para guiar cambios en `afs_fac_calcular_iibb_925`:
+  - SIRCIP unifica percepciones adheridas en una linea/concepto de percepcion SIRCIP, con alicuota unica por contribuyente y distribucion posterior por Comision Arbitral.
+  - Hay convivencia con regimen actual. Jurisdicciones no adheridas o no implementadas deben seguir con la logica actual.
+  - No romper CABA/ARBA (`901` y `902`); deben seguir mirando padrones/regimenes actuales mientras no esten adheridas/implementadas.
+  - Etapa inicial mencionada en la reunion: jurisdicciones `906`, `910`, `913`, `915`, `916`, `917`, `918`, `922`, `923`. En Afilmed, de esas se estaban calculando actualmente `910` Jujuy, `915` Neuquen y `918` San Juan.
+  - `campo7` tiene 25 posiciones; se usa de la 24 a la 1, cada posicion representa una jurisdiccion y se lee de derecha a izquierda.
+  - Para calcular SIRCIP no se debe buscar cualquier `1`, `2` o `3` en `campo7`. Debe tomarse solo la posicion correspondiente a la jurisdiccion del domicilio de facturacion.
+  - La jurisdiccion a imputar debe ser la del domicilio de facturacion, no necesariamente `925`.
+  - Si el contribuyente figura en padron:
+    - Codigo `1`: jurisdiccion adherida e inscripta; aplicar alicuota del padron.
+    - Codigo `2`: jurisdiccion adherida, no inscripto, con sobretasa; aplicar alicuota del padron y generar sobretasa separada del `1%`.
+    - Codigo `3`: jurisdiccion adherida, no inscripto, sin sobretasa; tratar como codigo `1`, aplicar alicuota del padron sin sobretasa.
+    - Codigo `4`: jurisdiccion no adherida, inscripto; no aplicar SIRCIP, seguir regimen local actual.
+    - Codigo `5`: jurisdiccion no adherida, no inscripto; no aplicar SIRCIP, seguir regimen local/punitorio actual.
+  - Si el contribuyente no figura en padron y el domicilio de facturacion pertenece a una jurisdiccion adherida/implementada SIRCIP:
+    - Aplicar punitorio general SIRCIP del `2%`.
+    - Debe tener concepto propio.
+  - Sobretasa codigo `2`:
+    - En factura debe ir como linea separada.
+    - En exportacion se informaria como registro separado tipo `5`, jurisdiccion de facturacion, alicuota `1%`.
+  - Percepcion normal:
+    - En exportacion tipo `1`.
+  - Punitorio por no estar en padron:
+    - En exportacion tipo `4`.
+  - Alícuota `A` o `0%`:
+    - Debe generar percepcion en cero y aparecer en comprobante/exportacion como informativo.
+  - Codigo `3` de operacion exceptuada queda en suspenso por falta de definicion funcional; por ahora no usarlo.
+  - Campo de operacion exceptuada, si no se usa, se definio poner `0`.
+  - Tipo de regimen de percepcion se definio por ahora como `1`, sin ceros a izquierda salvo validacion futura del importador.
+  - CRC viene del padron; para notas de credito hay duda sobre comprobante relacionado, pero criterio provisorio: mantener como se hace hoy en exportables actuales.
+  - Quedan pendientes de confirmacion funcional: monto minimo imponible, ambiente de prueba, padron de ejemplo, y definicion exacta de excluidos/codigo `3`.
+- Guia tecnica entregada para cambios futuros del SP `afs_fac_calcular_iibb_925`:
+  - No usar `@con_cod_juris_SIRCIP = 925` como jurisdiccion real de calculo; usar jurisdiccion de domicilio de facturacion.
+  - Reemplazar `PIA.campo7 LIKE '%1%' OR ...` por lectura posicional de `campo7`.
+  - Definir/mantener tabla o mapeo confiable entre `DCT.cod_juris` y posicion de `campo7`.
+  - Corregir referencias inexistentes a `PERCEPSIRCIP.vigen_hasta` y `PERCEPSIRCIP.tipo_contrib`.
+  - Evaluar join por `PERCEPSIRCIP.jurisdiccion`.
+  - Inicializar `@con_socio_sin_iibb_tipo` probablemente en `19`, siguiendo SPs similares.
+  - Implementar generacion separada para percepcion normal, sobretasa `1%` y punitorio `2%`.
+  - No aplicar fallback general a todos los contratos; limitar a jurisdicciones adheridas/implementadas.
+  - Mantener convivencia con regimen actual para jurisdicciones no adheridas.
+- Documento generado:
+  - Ruta: `/mnt/Agentes/Norma/ANALISIS/ARCA_SIRCIP/Cambios_sp_925.docx`.
+  - Contiene la guia de cambios derivada de la respuesta anterior.
+  - Validado como Microsoft Word 2007+.
+- Estado final:
+  - No se hicieron cambios de codigo en el repositorio.
+  - No se hizo `svn add`, `svn commit`, `svn delete`, `svn revert` ni cambios destructivos.
+  - Si se retoma el trabajo, verificar primero `svn status` y considerar `svn update` con config/credencial registrados antes de editar.
+  - No exponer credenciales ni secretos en Discord ni documentacion.
+
+## 2026-05-21 - Redmine 29699 / cambios sugeridos para listados Diego y Walter
+
+Resumen operativo para continuidad:
+
+- Interlocutor indicado por el contexto del mensaje: Diego / usuario operativo `dgiuseppe_info`.
+- Rama/working copy usada para el análisis: `dgiuseppe-2026.04`.
+- Redmine trabajado: `29699`.
+- Pedido principal:
+  - A partir de dos listas de SPs, documentar qué cambios se sugieren realizar según el criterio técnico del Redmine 29699.
+  - Generar documentos Markdown locales.
+  - Adjuntar los documentos al Redmine 29699.
+- Criterio técnico usado:
+  - `afi_deriv_aportes` debe conservar datos de derivación/aporte: `obra_soc`, `legajo`, `meses_a_estimar`, `inte_titular`, `sistema`, `aportante_tipo`, vigencias y claves del afiliado.
+  - `afi_deriv_empresas` debe concentrar datos de empresa: `cuit`, `empresa`, `sueldo`, `fecha_act_sueldo` y vigencias.
+  - `soli_deriv_aportes` debe conservar datos de derivación/aporte de solicitudes.
+  - `soli_deriv_aportes_empresas` debe concentrar datos de empresa de solicitudes.
+  - Campos a revisar/migrar cuando aparezcan en tablas de derivación: `cuit`, `empresa`, `sueldo`, `fecha_act_sueldo` y `deriva`.
+  - Riesgo principal reiterado: si se incorpora `afi_deriv_empresas` o `soli_deriv_aportes_empresas`, no unir solo por afiliado/vigencia sin definir si corresponde tomar todas las empresas, una empresa vigente, la de mayor sueldo, un CUIT puntual o una agregación.
+- Documento Diego:
+  - Archivo local generado: `redmine/29699/listado_diego_cambios_sugeridos.md`.
+  - Lista analizada: 23 SPs.
+  - Clasificación incluida por SP: evidencia encontrada y cambio sugerido.
+  - Principales SPs con cambio obligatorio o fuerte:
+    - `afi_afu_cuenta_trans`
+    - `afi_afu_deriv_apo_isss`
+    - `afi_aportes_ddjj`
+    - `afi_aportes_trans`
+    - `afi_fac_estado_cta_R1725`
+    - `afi_genera_aportes_estimados`
+    - `afi_import_batch`
+    - `afs_afiliados_x_cuenta_apor`
+    - `afs_arma_aportes`
+    - `afs_afi_expor_afip`
+    - `afs_creden_provi`
+    - `afs_creden_x_esta`
+    - `afs_detalle_afiliados`
+    - `afs_detalle_padron_farma`
+    - `afs_impre_creden_provisoria`
+    - `afs_imp_gen_cred_provi`
+    - `afs_sind_apo_x_cta_periodo_ine`
+    - `afs_sind_periodos_adeudados`
+    - `afs_valida_valor_aportes`
+    - `afu_cod_oper_isss`
+    - `afu_isss_afiliados_salud`
+    - `prs_hc_empresas_afi`
+  - Caso diferenciado: `afs_afi_aportes_meses_estim` quedó marcado sin cambio estructural directo por columnas eliminadas en líneas activas revisadas; mantiene lógica de `meses_a_estimar` en `afi_deriv_aportes`.
+  - Adjuntado al Redmine 29699 como `listado_diego_cambios_sugeridos.md`.
+  - ID de adjunto Redmine: `44014`.
+- Documento Walter:
+  - Archivo local generado: `redmine/29699/listado_walter_cambios_sugeridos.md`.
+  - Lista analizada: 36 SPs.
+  - Clasificación incluida por SP: evidencia encontrada y cambio sugerido.
+  - Principales SPs con cambio obligatorio o revisión fuerte:
+    - `afi_afu_deriv_apo_isss`
+    - `afs_arma_aportes`
+    - `afs_detalle_padron_farma`
+    - `afu_afi_deriv_aportes_xsoli`
+  - SPs de baja/reincorporación marcados para definición funcional sobre sincronización con `afi_deriv_empresas`:
+    - `afd_afiliados`
+    - `afd_afiliados_novedades_isss`
+    - `afu_reincorpora_afiliados`
+  - SPs sin cambio estructural directo quedaron identificados cuando solo usan `obra_soc`, `sistema`, `meses_a_estimar`, `aportante_tipo` o existencia/vigencia de derivación en `afi_deriv_aportes`.
+  - `afs_padron_de_bajas_afiliados` quedó marcado sin referencias detectadas a tablas de derivación.
+  - Adjuntado al Redmine 29699 como `listado_walter_cambios_sugeridos.md`.
+  - ID de adjunto Redmine: `44015`.
+- Validaciones realizadas:
+  - Se verificó existencia de los SPs en `backend/procedures`.
+  - Se revisaron referencias a tablas de derivación/empresa y campos impactados.
+  - Los archivos generados quedaron en UTF-8/ASCII sin BOM y finales LF.
+  - Redmine aceptó ambos adjuntos con respuesta HTTP `204`.
+  - Se verificó por API que ambos adjuntos quedaron listados en el issue.
+- Estado de repositorio:
+  - No se ejecutó `svn add`, `svn commit` ni publicación SVN.
+  - No se hicieron cambios de código ni cambios en base de datos.
+  - Los documentos quedaron localmente como no versionados dentro de `redmine/29699`.
+- Seguridad:
+  - Se usó la credencial Redmine registrada para el usuario operativo `dgiuseppe`.
+  - No se expusieron ni deben exponerse API keys, contraseñas, tokens ni secretos.
+
+## 2026-05-27 - Afilmed / impresion de comprobante por lote y cola Bullzip
+
+Resumen operativo para continuidad:
+
+- Interlocutora indicada por el contexto del mensaje: Luciana / usuario `lestevarena_info`.
+- Pedido principal:
+  - Analizar una ventana de Afilmed relacionada con lotes/procesos de facturacion y comprobantes.
+  - Ubicar el comprobante `A134501980946`.
+  - Explicar como encontrarlo en el lote y como imprimirlo por pantalla usando Bullzip.
+- Repositorios usados para contraste:
+  - `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-afilmed-DDL-trunk`
+  - `smg-code-afilmed`
+- Base usada para consulta de datos:
+  - Profile `SwissQAP10_afilmed`
+- Comprobante analizado:
+  - `@prm_ente = 2`
+  - `@prm_compro_tipo = 'FC'`
+  - `@prm_compro_nro = 'A134501980946'`
+- Resultado puntual:
+  - El comprobante pertenece al proceso/lote de facturacion `23005047`.
+  - En la grilla de resumen corresponde a la fila:
+    - `Proceso: 23005047`
+    - `Impresion: DIGITALIZAR`
+    - `Tipo Comprobante: Factura`
+    - `Letra: A`
+    - `Observaciones: TARJETA DE CREDITO GLOBAL PUEBA RESS VG`
+  - Para ese grupo se observaron:
+    - `Total: 3093`
+    - `Pend. Impr.: 3093`
+    - `Impresos: 0`
+    - `Digitaliz.: 1`
+- Datos puntuales del comprobante:
+  - `prefac_cab = 23005047`
+  - `letra = A`
+  - `se_imprime = N`
+  - `impre_fecha = NULL`
+  - `digi_fecha = NULL`
+  - `nro_secuencia = 1`
+  - `formato_nuevo = S`
+- Explicacion funcional de la ventana:
+  - La ventana no lista comprobantes individuales en la grilla principal.
+  - Lista grupos de comprobantes para administrar impresion/digitalizacion.
+  - El agrupamiento se realiza por:
+    - proceso de facturacion / `prefac_cab`
+    - tipo de comprobante
+    - letra
+    - modo de impresion
+  - La grilla `Resumen` usa el DataWindow `d_compro_impre_adm_fact`.
+  - Ese DataWindow ejecuta el SP `afs_compro_impresion_adm_impre`.
+  - El SP agrupa desde `COMPROBANTES` + `COMPRO_IMPRESION`.
+  - Los contadores se interpretaron como:
+    - `Total = COUNT(*)`
+    - `Impresos = COUNT(impre_fecha)`
+    - `Pend. Impr. = COUNT(*) - COUNT(impre_fecha)`
+    - `Digitaliz. = COUNT(digi_fecha)`
+  - La columna `Impresion` depende de `COMPRO_IMPRESION.se_imprime`:
+    - `S = IMPRIMIR/DIGITALIZAR`
+    - `N = DIGITALIZAR`
+  - Por eso el comprobante `A134501980946` cae en la fila `DIGITALIZAR`, no en `IMPRIMIR/DIGITALIZAR`.
+- Camino operativo indicado:
+  - Filtros usados por pantalla:
+    - `Entidad Juridica: SWISS MEDICAL S.A.`
+    - `Tipo de Proceso: Facturacion`
+    - `Periodo abierto: 04/2026`
+    - `Tipo Facturacion: Masiva`
+    - `Accion: Todos`
+  - Buscar el proceso `23005047`.
+  - Seleccionar la fila `DIGITALIZAR / Factura / A`.
+  - Usar `Pasar Selec.` para llevar el grupo a la solapa `A imprimir`.
+  - La ventana recupera el detalle mediante `afs_compro_impresion_detalle`.
+- Rango de impresion puntual:
+  - El comprobante `A134501980946` esta en la posicion/secuencia `1` dentro del lote `23005047`.
+  - Para imprimir solo ese comprobante se debe setear:
+    - `Desde: 1`
+    - `Hasta: 1`
+- Analisis del popup de impresoras:
+  - El boton `Impresora` levanta el popup `wr_impresoras_adm_impre`.
+  - El popup no toma automaticamente todas las impresoras locales instaladas.
+  - Recupera impresoras parametrizadas mediante `afs_impre_adm`.
+  - La parametrizacion se lee desde la tabla `DIGITALIZACION_COLAS`.
+  - Filtra por:
+    - `ente = 2`
+    - `uso = D`, `I` o `A`, segun la accion:
+      - `D = Digitalizar`
+      - `I = Imprimir`
+      - `A = Imprimir y Digitalizar`
+  - Luego valida que la impresora seleccionada exista en la PC/sesion Windows con `PrintGetPrinters()`.
+- Alta sugerida para Bullzip:
+  - Menu: `Facturacion y cuentas corrientes -> Colas de digitalizacion`.
+  - Agregar una fila para la impresora Bullzip con:
+    - `Nombre: Bullzip PDF Printer` o el nombre exacto visible en Windows/sesion remota.
+    - `Uso: D`
+    - `Ente: 2`
+    - `Unidad: 1`
+    - `Vigencia desde: primer dia del mes vigente`
+    - `Baja: vacio/null`
+  - Como el comprobante esta en la fila `DIGITALIZAR`, la cola requerida para el caso puntual es `uso = D`.
+- Advertencia operativa:
+  - Si Afilmed corre por Escritorio Remoto/Citrix, no alcanza con tener Bullzip instalada en la PC local.
+  - La impresora debe estar visible dentro de la sesion donde corre Afilmed, posiblemente como impresora redirigida.
+  - En ese caso, el nombre a parametrizar debe ser exactamente el que aparece dentro de esa sesion remota.
+- Estado:
+  - No se hicieron cambios de codigo.
+  - No se hicieron cambios en base de datos.
+  - Solo se realizo analisis de codigo, datos QA e imagenes enviadas por la usuaria.
+- Seguridad:
+  - No se expusieron ni deben exponerse hosts, usuarios, passwords, tokens, API keys ni otros secretos.
+
+## 2026-05-27 - Redmine 29797 / Especificacion funcional prestaciones
+
+Resumen operativo para continuidad:
+
+- Interlocutor del pedido: Betu / usuario `bwilvers_info_80774`.
+- Pedido principal:
+  - Usar la credencial Redmine registrada de `bwilvers`.
+  - Leer el adjunto `29797_prestaciones.pdf` del Redmine `29797`.
+  - Generar un documento de especificacion funcional con el formato de la plantilla `R-16 Documento de Especificacion Funcional.docx`.
+  - Dejar el entregable en `/mnt/Agentes/Betu/29797.docx`.
+- Redmine consultado:
+  - Issue `29797`
+  - Asunto: `Nuevos comprobantes y punto de venta`
+  - Estado observado: `En Analisis`
+  - Adjuntos relevantes observados:
+    - `29797.pdf`
+    - `29797_prestaciones.pdf`
+    - `Modificaciones Presmed.docx`
+    - imagen de clipboard del pedido original
+- Fuente funcional principal:
+  - `29797_prestaciones.pdf`
+  - El PDF limita el analisis al aplicativo `prestaciones`.
+  - El alcance funcional considerado incluye:
+    - Nuevos tipos de comprobantes legales en modulos donde se ingresen Facturas y Notas de Credito.
+    - Incorporacion de letra `E` en punto de venta.
+    - Ampliacion del punto de venta a formato `Letra + 5 digitos`.
+    - Cambio de descripcion visible `CAE` a `CAE/CAEA`.
+- Interpretacion funcional documentada:
+  - En prestaciones el impacto no es solo visual.
+  - Hay dos frentes:
+    - Cambio de labels/textos visibles de `CAE` a `CAE/CAEA`.
+    - Cambio estructural/funcional de punto de venta por supuestos historicos de `punto(4)`.
+  - Si el nuevo formato se persiste embebido en `compro_nro`, el largo natural pasa a:
+    - `letra(1) + punto(5) + numero(8) = 14`
+  - Riesgo principal: los cortes por posicion fija que usan punto de 4 digitos pueden truncar el punto y leer mal el numero AFIP.
+- Objetos/ventanas principales incluidos en la especificacion:
+  - Labels CAE/CAEA:
+    - `wp_modexped`
+    - `wp_expe_orde_cons`
+    - `wp_ingexped_farm`
+    - `wp_modexped_farm`
+    - `wp_expe_compro_externo`
+    - `wp_selexp_sup_gn_compro_deb`
+    - `wp_selexp_sup_gn_nota_db`
+    - `uo_nv_factu`
+  - DataWindows con labels visibles:
+    - `d_expe_ajus`
+    - `d_expe_compro_externo_factu`
+    - `d_expe_compro_externo_factu_farma`
+    - `d_expe_comprobante_modif_gnc`
+    - `d_expe_farm`
+    - `d_expe_odon`
+    - `d_expe_orde`
+    - `d_expe_sana`
+  - Punto de venta separado:
+    - `wp_puntos`
+    - `wp_entes_puntos`
+    - `wp_ente_punto`
+    - `wp_bloqueo_puntos`
+    - `wp_compro_cae_solicitar_ws`
+    - `wp_estado_wsfe`
+  - Punto de venta embebido en numero de comprobante:
+    - `uo_nv_afip_wsfe_autrequest`
+    - `uo_nv_afip_fecompconsultar`
+    - `wp_selexp_sup_gn`
+    - `wp_desliquida_expedientes`
+    - `wp_anulacion`
+    - `d_nota_deb_cred`
+- SQLs compartidos incluidos para revision funcional/tecnica:
+  - `afs_compro_cae_exportar`
+  - `afs_compro_cae_solicitud`
+  - `afs_liqui_compro_cae_exportar`
+  - `afs_compro_cae_cons`
+  - `afs_compro_resolicitar_cae`
+  - `afs_compro_falta_cae`
+  - `afu_compro_cae_grabar`
+  - `afs_codibarra_afip`
+  - `afs_revertir_comprobantes_main`
+  - `pru_entes_puntos`
+  - `pri_liquidacion_cierre`
+- Definiciones pendientes registradas en el documento:
+  - Confirmar si `compro_nro` se llevara a formato `letra + punto(5) + numero(8)` de 14 posiciones.
+  - Confirmar si el punto quedara separado como dato de 5 caracteres.
+  - Confirmar si la letra fiscal se mantiene separada o embebida en la representacion visible.
+  - Confirmar lista definitiva de nuevos tipos de comprobantes legales y modulos habilitados.
+  - Confirmar convivencia con comprobantes historicos de `punto(4)`.
+  - Confirmar impacto en impresiones y exportaciones donde se utiliza `CAE/CAEA`.
+- Repositorio usado solo para contraste:
+  - `dgiuseppe-2026.05`
+  - Se verifico por `svn info` que la working copy local corresponde a la rama `Britanico/branches/2026.05`.
+  - No se ejecuto `svn update`, `svn add`, `svn commit` ni ningun cambio en el repositorio.
+  - Se contrasto la existencia de objetos principales en la fuente local.
+- Base de datos:
+  - No se consulto `Test_Britanico` porque el PDF y el contraste de codigo fueron suficientes para el documento funcional.
+- Plantilla y generacion:
+  - Plantilla usada como referencia: `/mnt/Agentes/Betu/plantillas/R-16 Documento de Especificacion Funcional.docx`.
+  - Herramienta usada para generar el DOCX: `pandoc` con `--reference-doc`.
+  - Documento final generado: `/mnt/Agentes/Betu/29797.docx`.
+- Validaciones ejecutadas:
+  - Se verifico que el DOCX resultante sea Microsoft Word 2007+.
+  - Se valido internamente el ZIP del DOCX y la presencia de `word/document.xml` y `word/styles.xml`.
+  - Se verifico que el documento contenga secciones principales:
+    - `Requerimiento Detallado`
+    - `Proceso Actual`
+    - `Modificaciones a realizar`
+    - `Base de datos`
+    - `Funcionalidades afectadas`
+    - `Definiciones pendientes`
+    - `Exclusiones`
+  - Se convirtio el DOCX generado a PDF temporal con LibreOffice headless como prueba de apertura/conversion.
+- Estado:
+  - Entregable final creado en `/mnt/Agentes/Betu/29797.docx`.
+  - No se hicieron cambios de codigo.
+  - No se hicieron cambios en base de datos.
+  - No se hicieron commits ni publicaciones.
+- Seguridad:
+  - Se uso la credencial Redmine registrada para `bwilvers`.
+  - No se expusieron ni deben exponerse API keys, contrasenas, tokens ni secretos.
+
+## 2026-05-27 - Documento Presmed con rutas de ventanas / Validacion atributos productos medicamentos
+
+Resumen operativo de lo trabajado el 2026-05-27, para reutilizar mas adelante:
+
+- Interlocutor por Discord DM identificado en el contexto conversacional como Norma. Por reglas de identidad, no asumir identidad del sender en futuras sesiones si no existe metadata confiable o confirmacion explicita.
+- Pedido: tomar el documento `DocumentoRta_Validacion_27052026.docx`, copiarlo a una carpeta temporal local, agregar la ruta de cada ventana considerada en el analisis y generar `Rta_Validacion_27052026-Ventanas.docx` en la misma carpeta temporal, para luego copiarlo al directorio de analisis de PRESMED.
+- Repositorios autorizados para consulta por el humano:
+  - `smg-code-presmed`
+  - `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-prestaci-DDL-trunk`
+- Profile DB autorizado si era necesario consultar base:
+  - `SwissDeVP10_prestaci`
+- No fue necesario consultar base de datos. La informacion de rutas se obtuvo del codigo PowerBuilder del repo `smg-code-presmed`.
+- Se valido que el documento origen existia y era Microsoft Word 2007+.
+- Se valido que ambos repositorios indicados existian localmente y estaban disponibles:
+  - `smg-code-presmed` en branch `main`
+  - working copy SVN `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-prestaci-DDL-trunk`
+- Se creo una carpeta temporal local de trabajo:
+  - `/home/luispicone/.openclaw/workspace/tmp-rta-validacion-ruPdud`
+- Documento local de trabajo copiado:
+  - `/home/luispicone/.openclaw/workspace/tmp-rta-validacion-ruPdud/DocumentoRta_Validacion_27052026.docx`
+- Documento final generado:
+  - `/home/luispicone/.openclaw/workspace/tmp-rta-validacion-ruPdud/Rta_Validacion_27052026-Ventanas.docx`
+- Documento final copiado al destino solicitado:
+  - `/mnt/Agentes/Norma/PRESMED/ANALISIS/Rta_Validacion_27052026-Ventanas.docx`
+- Se agrego al documento una seccion nueva llamada `Rutas de ventanas consideradas`.
+- Rutas de ventanas relevadas desde `ws_objects/prestaci.pbl.src/m_main.srm`:
+  - `wp_alta_produ_farma_atrib`: `Farmacia > Gestion de Productos`
+    - Evidencia: `m_main.srm`, linea aproximada `15227`.
+    - Ventana usada para gestion de productos, atributos de producto, SOLPED y drogas del producto.
+  - `wp_familias`: `Tablas > Productos > Familias`
+    - Evidencia: `m_main.srm`, linea aproximada `4049`.
+  - `wp_produ_familias_xprodu`: `Tablas > Productos > Productos x Familias`
+    - Evidencia: `m_main.srm`, linea aproximada `4079`.
+  - `wp_produ_icd`: `Tablas > Productos > Productos x Icd`
+    - Evidencia: `m_main.srm`, linea aproximada `4229`.
+  - `wp_prestaciones_ape_requisitos_asignados`: `Tablas > APE > Requisitos > En Prestaciones`
+    - Evidencia: `m_main.srm`, linea aproximada `3301`.
+  - `wp_familias_ape_requisitos_asignados`: `Tablas > APE > Requisitos > En Familias de Productos`
+    - Evidencia: `m_main.srm`, linea aproximada `3331`.
+  - `wp_diag_ape_requisitos_asignados`: `Tablas > APE > Requisitos > En Diagnosticos`
+    - Evidencia: `m_main.srm`, linea aproximada `3361`.
+  - `wr_bus_produ_icd_req`: `Tablas > APE > Requisitos > Busqueda de Requisitos por Diagnostico / Producto`
+    - Evidencia: `m_main.srm`, linea aproximada `3372`.
+  - `wp_prestaciones_ape`: `Tablas > APE > Prestaciones Recuperables`
+    - Evidencia: `m_main.srm`, linea aproximada `3422`.
+  - `wp_familias_ape`: `Tablas > APE > Familia de Productos Recuperable`
+    - Evidencia: `m_main.srm`, linea aproximada `3452`.
+- Caso especial sin menu directo:
+  - `wp_produ_familias`: acceso `Tablas > Productos > Familias > boton Productos`
+  - Evidencia: se abre desde el boton `Productos` de `ws_objects/farma.pbl.src/wp_familias.srw`, linea aproximada `192`, mediante `OpenSheetWithParm`.
+- Validaciones ejecutadas sobre el DOCX generado:
+  - `file`: Microsoft Word 2007+.
+  - `unzip -t`: sin errores en estructura ZIP interna.
+  - Conversion de prueba a PDF con LibreOffice headless OK.
+  - Verificacion con `pdftotext` de que la seccion `Rutas de ventanas consideradas` y objetos como `wp_alta_produ_farma_atrib` y `wp_produ_familias` aparecen en el PDF convertido.
+  - Verificacion del archivo final copiado al destino con `file` y `unzip -t`.
+- No se hicieron cambios de codigo.
+- No se hicieron cambios en base de datos.
+- No se hicieron commits ni publicaciones.
+- Seguridad:
+  - No se expusieron ni deben exponerse passwords, API keys, tokens ni secretos.
+
+## 2026-06-01 - Redmine 29430 / Importador inteligente Presmed
+
+Resumen operativo de lo trabajado el 2026-06-01, para reutilizar mas adelante:
+
+- Interlocutor por Discord DM identificado en el contexto conversacional como Marcelo Paduan / usuario Redmine `mepaduan`. Por reglas de identidad, no asumir identidad del sender en futuras sesiones si no existe metadata confiable o confirmacion explicita.
+- Pedido: usar credenciales Redmine registradas para `mepaduan`, analizar Redmine `29430`, revisar repositorio de base de datos y repositorio PowerBuilder indicados, y dejar analisis y solucion implementable en `/mnt/Agentes/Marcelo/R29430.docx`.
+- Redmine consultado:
+  - ID: `29430`
+  - Titulo: `Capitalizacion de 998 y 25001 en importador inteligente`
+  - Estado al momento de consulta: `Desarrollo en Progreso`
+  - Producto: `Presmed`
+  - Autor: Norma Aguero
+  - Asignado a: Marcelo Paduan
+- Repositorios analizados:
+  - Base de datos SVN: `infomedical.alberto.kostner-PRS-4035-Bloque-1-Importador-inteligente-20260326`
+    - Ruta local: `/home/luispicone/.openclaw/workspace/svn/infomedical.alberto.kostner-PRS-4035-Bloque-1-Importador-inteligente-20260326`
+    - Revision local observada: `1873033`
+    - Branch SVN: `PRS-4035-Bloque-1-Importador-inteligente-20260326`
+  - PowerBuilder Git: `smg-code-presmed`
+    - Ruta local: `/home/luispicone/.openclaw/workspace/git/smg-code-presmed`
+    - Branch observada: `main`
+- Opcion funcional indicada por el humano:
+  - Liquidaciones > Carga de expedientes > Importacion inteligente.
+- Evidencia PowerBuilder principal:
+  - Menu `Importacion inteligente` en `ws_objects/prestaci.pbl.src/m_main.srm`, lineas aproximadas `15722` a `15730`, abre `wp_import_exp_new`.
+  - Ventana `ws_objects/liqui13.pbl.src/wp_import_exp_new.srw`.
+  - `ue_importar_int` deriva acciones `5`, `6` y `7` a `wf_impact_temp_imp_inteli`.
+  - `wf_impact_temp_imp_inteli` ejecuta `pri_impactar_temp_imp_inteli` con `@prm_ofi`, `@prm_expe`, `@prm_cbx_unit`, `@prm_accion`, `@prm_alta_mod` y `@prm_prestad_lugar`.
+- Evidencia SQL principal:
+  - Procedimientos relacionados:
+    - `procedures/pri_cargar_temp_imp_inteli.sql`
+    - `procedures/pri_valida_temp_imp_inteli.sql`
+    - `procedures/pri_impactar_temp_imp_inteli.sql`
+    - `procedures/prs_get_err_temp_imp_inteli.sql`
+  - El procedimiento clave es `procedures/pri_impactar_temp_imp_inteli.sql`.
+  - En accion `6`, ordenes/sanatorios, carga items vigentes del expediente con origen `E`, carga registros del TXT con origen `A`, compara claves y marca estados.
+- Causa raiz documentada:
+  - La validacion 1 de accion `6` marca como `D` los items origen `E` que no tienen equivalente origen `A`.
+  - Esa validacion no exceptua prestaciones `998` ni `25001`.
+  - Por eso, si el expediente tiene `998` o `25001` y el TXT no trae ningun `998`/`25001`, esos items pueden terminar en devolucion a conectividad.
+- Segunda causa funcional:
+  - El alta de nuevos items `estado = 'N'` recorre filas individuales.
+  - No agrupa previamente por afiliado (`prepaga`, `contra`, `inte`), fecha de realizacion (`rea_fecha`) y nomenclador (`nomen`).
+  - Resultado: se crean cabeceras/items separados donde el requerimiento pide un unico item cabecera por grupo.
+- Solucion propuesta documentada:
+  - En `pri_impactar_temp_imp_inteli.sql`, accion `6`, validacion 1, agregar una exclusion para no marcar como `D` items `T1.prestac IN ('998', '25001')` cuando no exista ningun registro origen `A` con `prestac IN ('998', '25001')`.
+  - Si el TXT trae algun `998` o `25001`, no aplicar la excepcion y conservar operatoria actual.
+  - Reestructurar altas `estado = 'N'` para crear una cabecera `expe_ordenes` por grupo `prepaga`, `contra`, `inte`, `rea_fecha`, `nomen`, y luego insertar los detalles `expe_orden_items` bajo el mismo `item`.
+  - Tomar una linea representante del grupo para datos de cabecera no incluidos en la clave funcional, dejando documentada esa decision.
+  - Evaluar replicar criterio en rama honorarios si accion `7` puede impactar expedientes tipo `H`.
+- Entregables generados:
+  - Documento Word final: `/mnt/Agentes/Marcelo/R29430.docx`
+  - Fuente markdown usada para generar el Word: `/mnt/Agentes/Marcelo/R29430.md`
+- Validaciones ejecutadas:
+  - Se valido existencia de repositorios y carpeta destino.
+  - Se consulto Redmine por API usando credencial registrada de `mepaduan`, sin exponer la API key.
+  - Se uso `rg`, `sed`, `nl`, `svn info`, `svn status`, `git status` para evidencia de codigo.
+  - Se genero el DOCX con `pandoc`.
+  - Se valido el DOCX con `unzip -t`.
+  - Se convirtio el DOCX a texto con `pandoc -t plain` para verificar contenido principal.
+- Estado:
+  - No se hicieron cambios de codigo.
+  - No se hicieron cambios en base de datos.
+  - No se hicieron commits ni publicaciones.
+- Seguridad:
+  - No se expusieron ni deben exponerse passwords, API keys, tokens, rutas de archivos de credenciales ni otros secretos.
+
+## 2026-06-05 - Redmine 29699 / Britanico 2026.04 / scripts de prueba afi_deriv_aportes
+
+Resumen operativo de lo trabajado el 2026-06-05, para reutilizar mas adelante:
+
+- Interlocutor por Discord DM identificado en contexto conversacional como Diego / usuario SVN `dgiuseppe`. Por reglas de identidad, no asumir identidad del sender en futuras sesiones si no existe metadata confiable o confirmacion explicita.
+- Alcance definido por el humano:
+  - Trabajar solo con la working copy SVN `dgiuseppe-2026.04`.
+  - Rama funcional: `Britanico/branches/2026.04`.
+  - Redmine asociado: `29699`.
+- Objetivo tecnico:
+  - Armar scripts de ejecucion de prueba para SPs afectados por el cambio estructural de `afi_deriv_aportes`.
+  - Cubrir dos escenarios:
+    - DB anterior al cambio, sin tabla `afi_deriv_empresas`, usando datos historicos en `afi_deriv_aportes` como `cuit` y `deriva`.
+    - DB posterior al cambio, con tabla `afi_deriv_empresas`, tomando datos de empresa/CUIT desde esa tabla.
+  - Mantener los scripts separados por SP y versionados en `redmine/29699`.
+- Criterio tecnico aplicado:
+  - Los scripts detectan la estructura disponible mediante `OBJECT_ID('dbo.afi_deriv_empresas', 'U')`.
+  - Cuando hay referencias a columnas que no existen en una de las estructuras, se uso `sp_executesql` para evitar errores de compilacion por columnas ausentes en la DB alternativa.
+  - Las ejecuciones quedan protegidas con `BEGIN TRAN` y `ROLLBACK` cuando el SP o la preparacion del caso puede modificar datos.
+  - No se ejecutaron los scripts porque contienen `UPDATE` o ejecutan SPs con impacto potencial, aunque esten protegidos con `ROLLBACK`.
+  - Se respeto la regla SQL local: sin finalizador de punto y coma y sin `RTRIM` en los scripts nuevos.
+- Script inicial generado y versionado:
+  - `redmine/29699/test_afs_arma_aportes_afi_deriv_aportes.sql`
+  - Revision SVN inicial: `8126`.
+  - Luego reemplazado para tener dos partes, DB anterior y DB posterior.
+  - Revision SVN de reemplazo: `8127`.
+- Scripts adicionales generados y versionados en revision SVN `8128`:
+  - `redmine/29699/test_afd_afiliados_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afi_revertir_ajustes_aportes_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_afiliados_x_plan_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_afi_expor_crm_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_afi_expor_sss_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_cons_deriv_aportes_sistema_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_detalle_padron_farma_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_padron_de_bajas_afiliados_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_padron_morosos_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_padron_rnas_sss_afi_deriv_aportes.sql`
+  - `redmine/29699/test_afs_padron_sss_afi_deriv_aportes.sql`
+  - `redmine/29699/test_prs_cons_droga_prest_recupero_afi_deriv_aportes.sql`
+- Commits realizados:
+  - Revision `8126`: alta de `test_afs_arma_aportes_afi_deriv_aportes.sql`.
+  - Revision `8127`: reemplazo del mismo script para cubrir DB anterior y posterior.
+  - Revision `8128`: alta de los 12 scripts separados restantes.
+  - Los commits se hicieron usando la identidad SVN registrada para la working copy, asociada a `dgiuseppe`.
+- Evidencia tecnica observada:
+  - En `Test_Britanico`, `afi_deriv_aportes.deriva` ya no existe, por lo que el SP anterior falla hasta que se ajuste.
+  - En `Test_Britanico`, `afi_deriv_aportes` ya tiene estructura nueva y `afi_deriv_empresas` existe.
+  - En `Test_Britanico`, al momento del relevamiento, `meses_a_estimar > 0` tenia cantidad `0`; por eso el script de `afs_arma_aportes` fuerza `meses_a_estimar = 1` dentro de transaccion para pasar por el bloque.
+- Validaciones ejecutadas:
+  - `svn info` y `svn status` sobre `dgiuseppe-2026.04`.
+  - Busqueda con `rg` de firmas y referencias a `afi_deriv_aportes`.
+  - Lectura de SPs en `backend/procedures`.
+  - Validacion de archivos generados con `file`.
+  - Verificacion de finales de linea con Perl: todos los scripts nuevos quedaron LF.
+  - Verificacion con `rg` de ausencia de `RTRIM` y de punto y coma en los scripts generados.
+  - Verificacion posterior al commit con `svn info` y `svn status` sobre los archivos versionados.
+- Estado:
+  - Scripts creados y commiteados.
+  - No se ejecutaron cambios sobre base de datos.
+  - Quedaron otros archivos no versionados previos dentro de `redmine/29699`; no fueron tocados ni commiteados en estas intervenciones.
+- Seguridad:
+  - No guardar ni exponer passwords, API keys, tokens ni archivos de credenciales asociados a SVN o base de datos.
+
+## 2026-06-08 - Preferencia operativa para usuario OMAR
+
+- Cuando el interlocutor indique que escribe desde el usuario OMAR, los documentos generados o dejados por el agente deben ubicarse siempre en `/mnt/Agentes/OMAR`.
+- La carpeta destino `/mnt/Agentes/OMAR` fue validada como existente el 2026-06-08.
+- Cuando el interlocutor indique que escribe desde el usuario OMAR y solicite revisar, consultar o documentar un Redmine, usar siempre la credencial Redmine registrada para el usuario `ogomez`.
+- La credencial Redmine de `ogomez` fue validada como registrada en el almacen seguro local el 2026-06-08, con archivo de credencial en permisos 600. No exponer API keys, rutas internas ni contenido del archivo de credenciales.
+- Cuando el interlocutor indique que escribe desde el usuario OMAR y especifique un repositorio, base de datos o profile concreto, acotar la revision solo a esa referencia indicada. No ampliar busquedas ni validaciones a otros repositorios, bases o profiles salvo pedido explicito del interlocutor.
+
+## 2026-06-12 - Julian Castilla / Redmine / Farmacias Importacion Droguerias
+
+Resumen operativo de la sesion del 2026-06-12 con Julian Castilla (`jcastilla@infomedical.com.ar`), para reutilizar mas adelante:
+
+- Identidad conversacional:
+  - Interlocutor identificado por metadata de Google Chat como Julian Castilla.
+  - Usuario Redmine informado: `jcastilla`.
+  - Se registro credencial Redmine local para `jcastilla`; no guardar ni exponer API key, tokens, passwords ni contenido de archivos de credenciales.
+- Contexto de workspace consultado:
+  - Perfiles de base disponibles informados desde `DB_PROFILE.md`:
+    - `InstallQA_89` - SQL Server.
+    - `PruebasCoreINFOMEDICAL` - SQL Server.
+    - `Test_Britanico` - SQL Server.
+    - `prevencion_entrega` - SQL Server.
+    - `SwissQAP10_afilmed` - Sybase ASE.
+    - `SwissQAP10_prestaci` - Sybase ASE.
+    - `SwissDeVP10_afilmed` - Sybase ASE.
+    - `SwissDeVP10_prestaci` - Sybase ASE.
+    - `Britanico_Prod` - SQL Server.
+  - Repositorios disponibles informados desde `REPOSITORIOS.md`:
+    - `dgiuseppe-2026.05` - SVN.
+    - `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-afilmed-DDL-trunk` - SVN.
+    - `smg-code-afilmed` - Git.
+    - `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-prestaci-DDL-trunk` - SVN.
+    - `smg-code-presmed` - Git.
+    - `infomedical.norma.aguero-IIBB-SIRCIP-info` - SVN.
+    - `dgiuseppe-2026.04` - SVN.
+    - `infomedical.alberto.kostner-PRS-4035-Bloque-1-Importador-inteligente-20260326` - SVN.
+    - `dgiuseppe-Prevencion-trunk` - SVN.
+  - En `/mnt/Agentes/Julian` se observo `Hola.txt`.
+- Analisis funcional realizado:
+  - Pedido: documentar el funcionamiento del formulario `Farm. / Importaciones / Importacion Droguerias` usando perfil `SwissQAP10_afilmed` y repositorio `smg-code-presmed`.
+  - Menu `Importacion Droguerias` abre la ventana PowerBuilder `wp_import_drogueria`.
+  - `Leer Archivo` ejecuta `ue_agregar`: selecciona un `.TXT`, lee lineas por posiciones fijas y carga datos en memoria en `d_carga_drogueria2`; no graba base en esta etapa.
+  - `Importar` ejecuta `ue_aceptar`: valida filas, formato de fecha de prescripcion, oficina, expediente y reproceso; luego llama al SP `prestaci.dbo.pri_farma_batch_scienza` por cada fila con `@sap = 'N'`.
+  - Nota tecnica importante: aunque el perfil solicitado fue `SwissQAP10_afilmed`, el procedimiento y las tablas transaccionales de importacion pertenecen a `prestaci`; `afilmed` se usa cruzado para resolver prepaga del contrato.
+- Tablas y objetos involucrados relevados:
+  - PowerBuilder:
+    - `wp_import_drogueria.srw`.
+    - `d_carga_drogueria2.srd`.
+  - Procedimiento principal:
+    - `pri_farma_batch_scienza.sql`.
+  - Tablas transaccionales principales:
+    - `expe_farmacias`.
+    - `expe_farma_recetas`.
+    - `expe_farma_rece_items`.
+  - Tablas auxiliares / de validacion o lookup involucradas por el SP:
+    - `expedientes`.
+    - `farmacias`.
+    - `mandatarias`.
+    - `afiliados`.
+    - `prestadores`.
+    - `productos`.
+    - `productos_conver_sap_presmed`.
+    - `autorizaciones`.
+- Entregable generado:
+  - Se genero un DER logico en PDF para Importacion Droguerias.
+  - Archivo final: `/mnt/Agentes/Julian/Farmacias/Importador/DER-impor_droguerias.pdf`.
+  - Formato: PDF A2 apaisado, 1 pagina.
+  - Contenido: DER del flujo `wp_import_drogueria -> prestaci.dbo.pri_farma_batch_scienza`, distinguiendo FK fisicas de relaciones logicas inferidas por el SP.
+  - Validaciones ejecutadas:
+    - `pdfinfo` confirmo 1 pagina, PDF 1.4, A2.
+    - `pdftotext` confirmo contenido textual.
+    - `pdftoppm` renderizo el PDF a PNG para revision visual.
+  - No se hicieron cambios sobre base de datos.
+  - No se hicieron cambios de codigo.
+  - No se hicieron commits.
+- Seguridad:
+  - No guardar ni exponer la API key de Redmine de `jcastilla`.
+  - No exponer passwords, tokens ni contenido de archivos de credenciales.
+
+## 2026-06-13 - AFILMED / Analisis impresion desde Cuenta Corriente
+
+Resumen operativo de lo trabajado el 2026-06-13 con Norma:
+
+- Pedido: ubicar los objetos del aplicativo AFILMED correspondientes a `Cuentas Corrientes / Administracion de Cuenta Corriente / doble click sobre una fila de la grilla principal` y documentar el analisis en DOCX.
+- Repositorios utilizados:
+  - SVN DDL: `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-afilmed-DDL-trunk`.
+  - Git: `smg-code-afilmed`, branch `main`.
+- Profile indicado para base: `SwissDeVP10_afilmed`.
+- No fue necesario consultar datos de negocio en base para resolver el circuito; el analisis se hizo por codigo PowerBuilder exportado y DDL local.
+- Navegacion identificada:
+  - Menu: `ws_objects/afilia.pbl.src/m_afilia.srm`.
+  - Item: `m_cuentacorrienteporafiliado`.
+  - Texto funcional: `Administracion de Cuenta Corriente`.
+  - Apertura: `OpenSheetWithParm(wp_ctacte,'Adctacte', parentwindow, upperbound(m_afilia.item[]) - 1, original!)`.
+- Ventana principal identificada:
+  - `ws_objects/facturacion.pbl.src/wp_ctacte.srw`.
+  - Objeto: `wp_ctacte`.
+  - Grilla principal: `tab_comprobantes.tp_principal.dw_compro`.
+  - DataObject de la grilla: `d_ctacte_afi_compro_lista`.
+- DataWindow principal de grilla:
+  - Archivo: `ws_objects/facturacion.pbl.src/d_ctacte_afi_compro_lista.srd`.
+  - Procedure de recuperacion: `dbo.afs_ctacte_afi_compro_lista`.
+  - Campos relevantes para el doble click: `ente`, `compro_tipo`, `compro_nro`, `impre_fecha`, `factu_perio`, `total`, `saldo`, vencimientos, cuenta y subcuenta.
+- Evento de doble click:
+  - Ubicacion: `wp_ctacte.srw`, evento `dw_compro::doubleclicked`.
+  - Si `ROW <= 0`, no ejecuta accion.
+  - Carga una estructura `str_comprobantes` con `compro_nro`, `compro_tipo`, `ente` y `factu_perio = DATE(impre_fecha)` desde la fila seleccionada.
+  - Si el filtro `pdf_digitalizado` esta en `S`, intenta abrir el comprobante digitalizado por URL usando `uo_nv_digitalizacion.of_geturl_comprobante`.
+  - Tipos mapeados para PDF digitalizado: `FC` = FACTURA, `NC` = NOTA DE CREDITO, `ND` = NOTA DE DEBITO.
+  - Si obtiene URL, usa `n_inet.hyperlinktourl`.
+  - Si no aplica PDF digitalizado, abre `w_preview_compro_impre` con `OPENWITHPARM(w_preview_compro_impre,str_comprobantes)`.
+- Estructura de parametros:
+  - Archivo: `ws_objects/facturacion.pbl.src/str_comprobantes.srs`.
+  - Campos: `factu_perio`, `compro_tipo`, `compro_nro`, `session_id`, `ente`, `tipo`, `ventana_origen`.
+- Preview/impresion:
+  - Ventana: `ws_objects/facturacion.pbl.src/w_preview_compro_impre.srw`.
+  - En `open`, recibe `message.powerobjectparm`, crea temporales `IMPRESION_COMPROBANTES`, calcula paginas y llama a `obtener_factura_impre`.
+  - Subrutina central: `obtener_factura_impre`.
+  - DataStore primario: `d_compro_impresion_prn_aux`.
+  - DataWindows finales segun formato: `d_compro_impresion_prn_3_ecco`, `d_compro_impresion_prn_3`, `d_compro_impresion_prn_2`.
+  - El boton imprimir dispara `ue_print`, registra auditoria con `wf_compro_impr_audit` y actualiza fecha de impresion con `wf_compro_impre_fecha`.
+- DataWindows/procedures principales de impresion relevados:
+  - `d_compro_impresion_prn_aux` -> `dbo.afs_compro_impresion`.
+  - `d_compro_impresion_prn`, `d_compro_impresion_prn_2`, `d_compro_impresion_prn_3`, `d_compro_impresion_prn_3_ecco` -> formatos de comprobante.
+  - `d_compro_impresion_items_prn` -> `dbo.afs_compro_impresion_items`.
+  - `d_compro_impresion_ctate` -> `dbo.afs_compro_impresion_ctacte`.
+  - `d_compro_impresion_msjs_prn` -> `dbo.afs_compro_impresion_msjs`.
+  - `d_compro_impresion_msjs_venc_prn` -> `dbo.afs_compro_impresion_msjs_venc`.
+  - `d_compro_impresion_rein` / `d_compro_impresion_rein_2` -> `dbo.afs_compro_impresion_rein`.
+- Procedures DDL localizados en el SVN:
+  - `procedures/afs_ctacte_afi_compro_lista.sql`.
+  - `procedures/afs_compro_impresion.sql`.
+  - `procedures/afs_compro_impresion_items.sql`.
+  - `procedures/afs_compro_impresion_ctacte.sql`.
+  - `procedures/afs_compro_impresion_msjs.sql`.
+  - `procedures/afs_compro_impresion_msjs_venc.sql`.
+  - `procedures/afs_compro_impresion_rein.sql`.
+  - `procedures/afs_compro_tipos.sql`.
+  - `procedures/afs_comprobante.sql`.
+  - `procedures/afs_ctacte_impr_audit.sql`.
+- Entregable generado:
+  - Archivo final: `/mnt/Agentes/Norma/AFILMED/Impresion_ctacte.docx`.
+  - Formato: Microsoft Word 2007+ / Office Open XML.
+  - Contenido: alcance, resultado ejecutivo, objetos del aplicativo, flujo de doble click, camino PDF digitalizado, camino preview PowerBuilder, DataWindows, procedures DDL, evidencia, hipotesis, recomendacion, validaciones, riesgos y limites.
+  - Validaciones ejecutadas: existencia del archivo, `file` confirmo Word 2007+, `unzip -t` sin errores.
+- No se hicieron cambios en repositorios Git ni SVN.
+- No se hicieron commits.
+- Seguridad:
+  - No guardar ni exponer passwords, tokens ni contenido de archivos de credenciales.
+  - Si se retoma este tema, usar como punto de partida tecnico `wp_ctacte.srw`, evento `dw_compro::doubleclicked`, y `w_preview_compro_impre.srw`, subrutina `obtener_factura_impre`.
+
+## 2026-06-16 - AFILMED / Campos sombreados en impresion de Cuenta Corriente
+
+Resumen operativo de lo trabajado el 2026-06-16 con Norma:
+
+- Pedido: continuar el analisis de impresion desde Cuenta Corriente de AFILMED y ubicar de donde salen los valores de los campos sombreados del comprobante.
+- Repositorios utilizados:
+  - SVN DDL: `infomedical.LuHernandez-swiss-mp-prod-base_de_datos-sybase-sybase-DB1-sybase-afilmed-DDL-trunk`.
+  - Git: `smg-code-afilmed`, branch `main`.
+- Profile de referencia: `SwissDeVP10_afilmed`.
+- Ruta funcional y tecnica consolidada:
+  - `wp_ctacte` -> `w_preview_compro_impre` -> `d_compro_impresion_prn_aux` -> `dbo.afs_compro_impresion` -> `dbo.afs_compro_impresion_4`.
+- Conclusion tecnica:
+  - En el flujo desde Cuenta Corriente, los importes sombreados no se calculan en PowerBuilder.
+  - PowerBuilder recupera los datos desde `d_compro_impresion_prn_aux`, copia columnas al DataWindow final `d_compro_impresion_prn_3` y los valores vienen calculados o armados desde Sybase.
+- Campos ubicados:
+  - `Codigo Ident. de Grupo (C.I.G.)`: columna `cig` en `ws_objects/prefactu.pbl.src/d_compro_impresion_prn_3.srd`; transporte en `w_preview_compro_impre.srw`, subrutina `obtener_factura_impre`; carga en `procedures/afs_compro_impresion_4.sql`; calculo base en `procedures/afs_fac_generar_cig.sql`.
+  - `NETO EXENTO`: columna final `importe_exento`; en Cuenta Corriente se arma como `CI.importe_exento - CI.percep_otros` dentro de `procedures/afs_compro_impresion_4.sql`; origen previo `#FAC_COMPROBANTES.exen = CAG.iva_exento` en `procedures/afi_fac_comprobantes_mass.sql`.
+  - `Percep. IB`: columna final `importe_iibb`; se recalcula sumando items del detalle cuyo concepto esta configurado en `IB_PROVINCIAS_CONFIG.factu_concep_ib`, dentro de `procedures/afs_compro_impresion_4.sql`; luego actualiza `#TEMP_CABECERA.importe_iibb`.
+  - Validacion numerica observada para `Percep. IB`: `ISC 10.178,26 + IST 2.261,84 = 12.440,10`.
+  - `NETO GRAVADO`: columna final `importe_gravado`; origen previo `CAG.neto_gravado` en `procedures/afi_fac_comprobantes_mass.sql`.
+  - `IVA Contenido`: columna final `importe_iva`; origen previo `CAG.iva` en `procedures/afi_fac_comprobantes_mass.sql`.
+  - `TOTAL FACTURA`: columna final `importe_total`; origen previo `CAG.total` en `procedures/afi_fac_comprobantes_mass.sql`.
+- Objetos fuente consultados:
+  - PowerBuilder: `ws_objects/facturacion.pbl.src/w_preview_compro_impre.srw`; `ws_objects/prefactu.pbl.src/d_compro_impresion_prn_3.srd`; DataWindow auxiliar `d_compro_impresion_prn_aux`.
+  - Sybase DDL: `procedures/afs_compro_impresion.sql`; `procedures/afs_compro_impresion_4.sql`; `procedures/afs_fac_generar_cig.sql`; `procedures/afi_fac_comprobantes_mass.sql`.
+- Entregable actualizado:
+  - Documento encontrado y actualizado: `/mnt/Agentes/Norma/AFILMED/ANALISIS/Impresion_ctacte.docx`.
+  - Se agrego la seccion `Analisis agregado - campos sombreados`.
+  - Backup generado: `/mnt/Agentes/Norma/AFILMED/ANALISIS/Impresion_ctacte.docx.bak_20260616_1724`.
+- Validaciones ejecutadas:
+  - Se valido existencia de los repositorios solicitados en `REPOSITORIOS.md`.
+  - Se valido existencia local de rutas Git/SVN y carpeta destino.
+  - Se valido branch `main` en `smg-code-afilmed`.
+  - Se valido existencia del profile `SwissDeVP10_afilmed` en `DB_PROFILE.md`.
+  - Se revisaron objetos PowerBuilder y DDL mediante busquedas y lectura directa.
+  - Se valido integridad del DOCX con `unzip -t`, sin errores.
+- Riesgos y limites:
+  - Analisis estatico sobre codigo fuente exportado y DDL local.
+  - No se ejecuto la pantalla en runtime PowerBuilder.
+  - No se consulto la base Sybase porque los objetos locales alcanzaron para ubicar la cadena de calculo.
+  - No se modificaron repositorios Git ni SVN.
+  - No se hicieron commits.
+
+## 2026-06-17 - Daniel / Evolucion y prueba SKILL_ARBOL_PB
+
+Resumen operativo de lo trabajado el 2026-06-17 con Daniel:
+
+- Skill/propuesta principal:
+  - Nombre corto: `arbol-pb`.
+  - Variable operativa: `SKILL_ARBOL_PB`.
+  - Proposal ID: `arbol-pb-20260617-547acfde4b`.
+  - Estado al cierre: propuesta pendiente en Skill Workshop.
+- Skill relacionada:
+  - `SKILL_ARBOL_SQL`.
+  - Proposal ID: `arbol-sql-20260617-17ab706f0f`.
+  - Tambien se evoluciono para alinear PDF/Excel y cuadros del punto 4.
+- Repositorio usado para prueba PB:
+  - `smg-code-presmed`.
+  - Ruta local: `/home/luispicone/.openclaw/workspace/git/smg-code-presmed`.
+  - Carpeta de informes: `/mnt/Agentes/Daniel/smg-code-presmed/Informes/`.
+- Objeto PB probado:
+  - `wp_import_drogueria`.
+  - Archivo fuente: `/home/luispicone/.openclaw/workspace/git/smg-code-presmed/ws_objects/import2.pbl.src/wp_import_drogueria.srw`.
+  - PBL del objeto: `import2.pbl`.
+- Evoluciones acordadas para `SKILL_ARBOL_PB`:
+  - Cuadro 1 debe incluir PBL/repositorio del objeto analizado y PBL/repositorio del objeto dependiente.
+  - Cuadro 2 debe incluir PBL/repositorio del objeto analizado.
+  - Formatos de salida validos: `PDF A4 vertical`, `PDF A4 horizontal`, `Excel`.
+  - Excel debe tener una hoja por parte del informe.
+  - Para PDF, el punto 4 debe presentarse como cuadros separados por categoria.
+  - Para Excel, el punto 4 debe presentarse como cuadro jerarquico unico, filtrable.
+  - Paleta visual acordada: encabezados azules, texto blanco o azul oscuro, subencabezados azul claro, filas alternadas blanco/azul muy claro, bordes finos.
+  - El Excel debe generarse con estilos nativos OpenXML o libreria confiable, evitando XML fragil que Excel repare.
+- Mascara binaria agregada para condicionar tipos de objetos a buscar:
+  - Orden fijo: `.srw`, `.srd`, `.srf`, `.sru`, `.srm`, `.srs`, `SQL`.
+  - Default: `1111111`.
+  - Ejemplo: `1000101` busca ventanas, menus y SQL.
+  - `0`, `ok`, `default` o vacio equivalen a `1111111`.
+- Dependencias principales observadas en la prueba de `wp_import_drogueria`:
+  - Clase base: `w_clase` en `clases.pbl`.
+  - Controles base: `cb_ace_clase`, `cb_can_clase`, `dw_clase` en `clases.pbl`.
+  - DataWindows: `de_ofi_expe` en `liqui02.pbl`, `d_expedientes_farma_2` en `farma.pbl`, `d_carga_drogueria2` y `d_carga_drogueria2_errores` en `import2.pbl`.
+  - SQL/procedure detectado: `pri_farma_batch_scienza`.
+- Archivos generados en la primera prueba completa:
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2039_wp_import_drogueria_arbol_pb_a4_vertical.pdf`.
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2039_wp_import_drogueria_arbol_pb_a4_horizontal.pdf`.
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2039_wp_import_drogueria_arbol_pb.xlsx`.
+  - Se genero version corregida de Excel por reparacion detectada por Excel: `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2039_wp_import_drogueria_arbol_pb_corregido.xlsx`.
+- Archivos generados en la repeticion final de prueba:
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2218_wp_import_drogueria_arbol_pb_a4_vertical.pdf`.
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2218_wp_import_drogueria_arbol_pb_a4_horizontal.pdf`.
+  - `/mnt/Agentes/Daniel/smg-code-presmed/Informes/20260617_2218_wp_import_drogueria_arbol_pb.xlsx`.
+- Validaciones de la repeticion final:
+  - PDF vertical: A4, 3 paginas.
+  - PDF horizontal: A4 landscape, 4 paginas.
+  - Excel: 7 hojas (`01_Descripcion`, `02_Resumen_PB`, `03_Impacto`, `04_Arbol_Tecnico`, `05_Evidencia`, `06_DW_SQL`, `07_No_Resueltos`).
+  - Excel validado con `unzip -t`, XML interno y apertura/conversion tecnica con LibreOffice headless.
+  - No se modifico el repositorio ni se ejecuto nada en base de datos.
+- Tiempos medidos en la repeticion final:
+  - Total: `2.05 s`.
+  - Indexar objetos PB: `0.159 s`.
+  - Leer fuente y normalizar comentarios: `0.000 s`.
+  - Extraer dependencias salientes: `0.002 s`.
+  - Revisar SQL de DataWindows: `0.004 s`.
+  - Armar modelo de informe: `0.000 s`.
+  - Generar PDF A4 vertical: `0.190 s`.
+  - Generar PDF A4 horizontal: `0.190 s`.
+  - Generar Excel xlsx: `0.148 s`.
+  - Validar XML interno XLSX: `0.088 s`.
+  - Validar ZIP XLSX: `0.027 s`.
+  - Validar apertura LibreOffice headless: `1.242 s`.
+  - No hubo etapas mayores a 30 segundos; la mas costosa fue la validacion de Excel con LibreOffice.
+- Contexto para retomar:
+  - Daniel considero superada la prueba simple y pidio elevar complejidad al dia siguiente.
+  - Mantener cautela: las pruebas fueron analisis estatico; no se ejecuto PowerBuilder runtime ni base de datos.
+
+## 2026-06-18 - Evolucion propuesta skill git-clone
+
+Resumen operativo de lo trabajado el 2026-06-18:
+
+- Skill involucrada: `git-clone`.
+- Objetivo pedido: evolucionar la skill para que el clone Git no pida solo el link del repo, sino tambien usuario cuenta Git y rama.
+- Proposal ID en Skill Workshop: `git-clone-20260618-bbc731c455`.
+- Estado al cierre: propuesta pendiente, no aplicada sobre la skill viva.
+- Archivo de propuesta fuente:
+  - `/home/luispicone/.openclaw/skill-workshop/proposals/git-clone-20260618-bbc731c455/PROPOSAL.md`
+- Copia externa solicitada por Luis:
+  - `/mnt/Agentes/Luis/git-clone-20260618-bbc731c455-PROPOSAL.md`
+- Hash SHA256 de la copia final validada:
+  - `e5d21132bf221569a1bf5b4539f7737ce58ae54f2fdb39d8a837c9ab9e45dded`
+- Validacion de copia:
+  - Se ejecuto comparacion contra el original del Skill Workshop.
+  - Resultado informado: `COPIA_ACTUALIZADA_IDENTICA`.
+- Cambios funcionales incorporados en la propuesta:
+  - La skill debe pedir al inicio `usuario cuenta Git`, `repositorio Git` y `rama`.
+  - El `usuario cuenta Git` se usa para validar la identidad SSH y luego como `git config --local user.name`.
+  - Despues del clone validado solo debe pedir mail para configurar `git config --local user.email`.
+  - Debe buscar claves SSH de forma profunda, no solo en `~/.ssh`.
+  - Debe validar que la clave SSH autentique como el usuario informado.
+  - Debe ser util para GitLab y GitHub, no solo GitLab.
+  - Para GitLab, la validacion de usuario se basa en respuestas tipo `@usuario`.
+  - Para GitHub, la validacion de usuario se basa en respuestas tipo `Hi <usuario>!`.
+  - Debe validar acceso a repo y rama con `git ls-remote --heads`.
+  - Debe clonar la rama especifica con `git clone --branch <rama> --single-branch`.
+  - Para SSH, debe usar explicitamente la clave validada con `GIT_SSH_COMMAND`.
+  - Despues del clone, debe configurar `core.sshCommand` local con esa clave.
+  - La carpeta local y nombre logico deben armarse como `usuario-repo-rama`.
+  - Si el path remoto termina con un segmento repetido, se elimina el ultimo antes de normalizar; ejemplo: `smg-code/afilmed/afilmed` -> `smg-code-afilmed`.
+  - Ejemplo requerido: `ext_usuario-smg-code-afilmed-AF-3965-percepcion-iibb-arba`.
+  - `REPOSITORIOS.md` debe registrar la clave SSH asociada, clave publica si existe, fingerprint, usuario cuenta Git, usuario autenticado por SSH, rama y `core.sshCommand`.
+- Correccion importante durante la revision:
+  - La primera version quedo demasiado orientada a GitLab.
+  - Luis observo que debe servir para GitLab o GitHub.
+  - Se reviso la propuesta para generalizar proveedor, ejemplos, validacion SSH y registro.
+- Pendiente para retomar:
+  - Si Luis pide aplicar la propuesta, usar Skill Workshop con `action=apply` sobre `proposal_id=git-clone-20260618-bbc731c455`.
+  - No aplicar manualmente ni editar la skill viva por filesystem.
+
+## 2026-06-23 - Walter Ferreyra - Redmine 29934 / Plan Master 2541 Grupos Relacionados
+
+Resumen operativo para retomar luego:
+
+- Humano: Walter Ferreyra.
+- Redmine: `https://redmine.infomedical.com.ar/issues/29934`.
+- Subject Redmine: `CUENTAS Y SUBCUENTAS / CONFIGURACION DE SUBCUENTAS / BOTON GRUPO REL.`
+- Rama Git objetivo: `UPGRADE_Plan-Master-2541_Grupos-Relacionados`, creada desde `origin/develop`.
+- Repo Git usado para lectura: `/home/luispicone/.openclaw/workspace/git/smg-code-afilmed`.
+- La rama remota existe como `origin/UPGRADE_Plan-Master-2541_Grupos-Relacionados`; no se hizo commit ni push Git.
+- Carpeta de trabajo de Walter para dejar objetos sin comitear:
+  - `/mnt/Agentes/WalterF/Swiss/UPGRADE_Plan-Master-2541_Grupos-Relacionados`
+- SVN DDL branch:
+  - `/home/luispicone/.openclaw/workspace/svn/infomedical.nicolas.paz-UPGRADE_Plan-Master-2541_Grupos-Relacionados`
+  - URL: `http://lv36papf-svncorp.swm.com.ar:8888/svn/swiss/mp/prod/base_de_datos/sybase/sybase-DB1/sybase-afilmed/DDL/branches/UPGRADE_Plan-Master-2541_Grupos-Relacionados`
+- SQL table script:
+  - Redmine attachment descargado en `/tmp/redmine_29934/SUBCTA_GRUPO_RELACIONADO.sql`.
+  - Copiado a SVN en `tables/SUBCTA_GRUPO_RELACIONADO.sql`.
+  - Ejecutado en Sybase profile `SwissDeVP10_afilmed`; la tabla ya existia y el script informo existencia/creacion previa.
+  - Commit SVN realizado con mensaje `Tarea #29933 - MASTER 2541 Facturación segmentada entre empresa y socio (grupo familiar)`.
+  - Revision SVN comprometida: `1882596`.
+- Imagen Redmine de diseno:
+  - `/tmp/redmine_29934/grupo_rel.png`.
+  - Ventana esperada: titulo `Grupo Relacionado`, campos Cuenta/Subcuenta/Entidad, Vigencia Desde/Hasta, checks Baja/Domicilio/Comprobante, grilla, botones Alta/Baja/Grabar/Cancelar/Historico/Salir.
+- Decision tecnica PB:
+  - Para la nueva ABM se eligio copiar la familia `wp_subcta_os_mcc` + `d_subcta_os_mcc` + `d_lista_subcta_os_mcc`.
+  - Motivo: familia relacionada entre ventana, DWs y SPs, con gestion de cuenta/subcuenta/ente/vigencias mas cercana que otras opciones.
+  - Se descarto `d_lista_relaciones_perio` como base principal.
+- Objetos Save As ya dejados en carpeta de Walter:
+  - `wp_subcta_grupo_rel.srw` desde `wp_subcta_os_mcc.srw`.
+  - `de_subcta_grupo_rel.srd` desde `d_subcta_os_mcc.srd`.
+  - `d_subcta_grupo_rel.srd` desde `d_lista_subcta_os_mcc.srd`.
+  - `afu_subcta_grupo_rel.sql` desde `afu_subcta_os_mcc.sql`.
+  - `afd_subcta_grupo_rel.sql` desde `afd_subcta_os_mcc.sql`.
+  - `afs_vigencias_subcta_grupo_rel.sql` desde `afs_vigencias_mcc.sql`.
+- Validaciones realizadas sobre esos Save As:
+  - Headers PB/DW renombrados.
+  - Sin referencias viejas a `wp_subcta_os_mcc`, `d_subcta_os_mcc`, `d_lista_subcta_os_mcc`, `afu_subcta_os_mcc`, `afd_subcta_os_mcc`, `afs_vigencias_mcc`, `SUBCTA_OS_MCC` ni `afde_subcta_grupo_rel`.
+  - Referencias de tabla ajustadas a `SUBCTA_GRUPO_RELACIONADO`.
+  - SQL sin `;` ni `RTRIM`.
+  - Formatos conservados: PB/DW UTF-8 con BOM; SQL UTF-8/ASCII CRLF.
+- Advertencia tecnica:
+  - Los Save As son base inicial, no adaptacion funcional completa.
+  - Todavia falta ajustar columnas, parametros, logica y SPs reales a `SUBCTA_GRUPO_RELACIONADO`.
+- `wp_cuenta_subcta`:
+  - Objeto tomado desde `origin/UPGRADE_Plan-Master-2541_Grupos-Relacionados:ws_objects/empresas.pbl.src/wp_cuenta_subcta.srw`.
+  - Se dejo modificado en `/mnt/Agentes/WalterF/Swiss/UPGRADE_Plan-Master-2541_Grupos-Relacionados/wp_cuenta_subcta.srw`.
+  - Cambio realizado: se agrego evento `ue_subcta_grupo_rel`.
+  - Implementacion actual: `open(wp_subcta_grupo_rel)`.
+  - Se reutilizo `uo_1.cb_10`, antes `Plan/O. Social`, porque estaba mapeado pero deshabilitado en el flujo normal.
+  - Nuevo texto del boton: `Grupo relacionado`.
+  - Nuevo evento del boton: `ue_subcta_grupo_rel`.
+  - Se habilita `cb_10` cuando la busqueda devuelve subcuentas y se deshabilita cuando no hay resultados o al limpiar.
+  - Se ajusto ancho de `cb_10` de `+100` a `+300`.
+  - Diff validado contra la rama: solo alta del evento, remapeo de `cb_10`, ajuste de ancho y cambios de habilitacion.
+- Pendientes naturales para continuar:
+  - Adaptar funcionalmente `wp_subcta_grupo_rel`, `de_subcta_grupo_rel`, `d_subcta_grupo_rel` y sus SPs a la tabla `SUBCTA_GRUPO_RELACIONADO`.
+  - Revisar si `open(wp_subcta_grupo_rel)` debe recibir parametros de cuenta/subcuenta/entidad desde `wp_cuenta_subcta`.
+  - Cuando Walter lo indique, integrar objetos modificados a la rama Git y/o preparar commits.
+
+## 2026-06-23 - Continuidad Redmine 29934 / objetos PB y SPs grupo relacionado
+
+Resumen operativo de la continuacion en carpeta de Walter:
+
+- Carpeta de trabajo: `/mnt/Agentes/WalterF/Swiss/UPGRADE_Plan-Master-2541_Grupos-Relacionados`.
+- `wp_cuenta_subcta.srw`:
+  - `ue_subcta_grupo_rel` quedo adaptado para tomar la fila seleccionada de `dw_subcta`.
+  - Valida fila seleccionada.
+  - Abre `wp_subcta_grupo_rel` con `OpenWithParm`.
+  - Parametro enviado: `cuenta#subcta#vigen_desde`.
+- `wp_subcta_grupo_rel.srw`:
+  - Recibe `Message.StringParm` con `cuenta#subcta#vigen_desde`.
+  - Guarda parametros en variables de instancia.
+  - En `ue_limpiar`, aplica filtros internos de cuenta/subcuenta antes del retrieve.
+  - Se adapto la grabacion para llamar:
+    - `afd_subcta_grupo_rel(@prm_cuenta, @prm_subcta, @prm_vigen_desde)`.
+    - `afu_subcta_grupo_rel(@prm_cuenta, @prm_subcta, @prm_vigen_desde, @prm_vigen_hasta, @prm_auto_baja, @prm_domi_rel, @prm_compro_rel)`.
+  - Se retiraron de la logica de grabacion/validacion las referencias heredadas a `obra_soc`, `plan_codi_mcc`, `sistema` y filtros de sistema.
+- `de_subcta_grupo_rel.srd`:
+  - Layout adaptado al pedido visual: Cuenta, Subcuenta, Entidad, Vigencia Desde/Hasta, Baja, Domicilio, Comprobante.
+  - Mantiene columnas ocultas de soporte para `cuenta`, `subcta`, `alta_fecha`, `baja_fecha`, `ente_deno`.
+  - Se restauraron ocultas `filtro_cuenta_os` y `filtro_subcuenta_os` porque `w_clase_abm_filtro_entidad` y `of_grabar_filtros` las usan para poblar `FILTRO_CUENTA` y `FILTRO_SUBCUENTA`.
+- `d_subcta_grupo_rel.srd`:
+  - Lista adaptada a Cuenta, Subcuenta, Entidad, Vigencia Desde/Hasta, Baja, Domicilio, Comprobante.
+  - Removidas referencias heredadas de Obra Social, Plan MCC y Sistema.
+- SPs adaptados:
+  - `afs_subcta_grupo_rel.sql`: nuevo retrieve para las DW. Consulta `SUBCTA_GRUPO_RELACIONADO`, devuelve aliases esperados por DW (`baja`, `domicilio`, `comprobante`) desde columnas reales (`auto_baja`, `domi_rel`, `compro_rel`), deriva `ente` desde `CUENTAS` y filtra por `FILTRO_CUENTA`/`FILTRO_SUBCUENTA` del `@@spid`.
+  - `afu_subcta_grupo_rel.sql`: alta/modificacion por clave `cuenta`, `subcta`, `vigen_desde`; persiste `vigen_hasta`, `auto_baja`, `domi_rel`, `compro_rel`, `alta_fecha`, `modi_fecha`, `baja_fecha`.
+  - `afd_subcta_grupo_rel.sql`: baja logica por clave `cuenta`, `subcta`, `vigen_desde`, seteando `baja_fecha` y `modi_fecha`.
+  - `afs_vigencias_subcta_grupo_rel.sql`: control de solapamiento y superposicion para misma `cuenta/subcta`, sin reglas heredadas de plan/obra social/sistema.
+- Decision tecnica importante:
+  - La tabla real `/tmp/redmine_29934/SUBCTA_GRUPO_RELACIONADO.sql` no tiene columna `ente`; por eso `ente` queda solo como dato derivado para visualizacion/filtro desde `CUENTAS`, no se graba en `SUBCTA_GRUPO_RELACIONADO`.
+  - La tabla real usa `auto_baja`, `domi_rel`, `compro_rel`; las DW mantienen nombres amigables `baja`, `domicilio`, `comprobante` mediante aliases del SP.
+- Validaciones ejecutadas:
+  - SQL: sin `;`, sin `RTRIM`, sin referencias viejas a `obra_soc`, `plan_codi`, `sistema`, `filtro_sist`, `SUBCTA_OS_MCC`, `afs_subcta_os_mcc`, `afu_subcta_os_mcc`, `afd_subcta_os_mcc`, `afs_vigencias_mcc`.
+  - SQL: archivos ASCII con finales CRLF.
+  - PB/DW: UTF-8 con BOM preservado en `wp_subcta_grupo_rel.srw`, `de_subcta_grupo_rel.srd`, `d_subcta_grupo_rel.srd`.
+- Riesgo/reserva:
+  - No se compilo en PowerBuilder ni se ejecuto contra Sybase desde esta sesion.
+  - Revisar en PB si la clase base requiere botones visibles de filtro para altas manuales; para el flujo solicitado desde `wp_cuenta_subcta`, los filtros se aplican por parametro.
+
+## 2026-06-25 - Continuidad Redmine 29934 / defaults al abrir Grupo Relacionado
+
+Resumen operativo en carpeta de Walter:
+
+- Carpeta de trabajo: `/mnt/Agentes/WalterF/Swiss/UPGRADE_Plan-Master-2541_Grupos-Relacionados`.
+- Observacion desde imagen enviada por Walter:
+  - Al abrir `wp_subcta_grupo_rel`, quedaban vacios `Cuenta`, `Subcuenta` y `Entidad`.
+  - `Vigencia Desde` estaba cargada, pero debia quedar editable.
+- Ventana antecedente/copias:
+  - En memoria previa consta que los Save As iniciales fueron:
+    - `wp_subcta_grupo_rel.srw` desde `wp_subcta_os_mcc.srw`.
+    - `de_subcta_grupo_rel.srd` desde `d_subcta_os_mcc.srd`.
+    - `d_subcta_grupo_rel.srd` desde `d_lista_subcta_os_mcc.srd`.
+  - Como antecedente funcional viejo tambien existe en trunk `wp_subcta_grupo_relacionado.srw` con `d_subcta_grupo_relacionado.srd`, pero esa ventana vieja es un ABM simple sin `ente` visible y no fue la base Save As de la nueva ventana con filtros.
+- Cambios aplicados:
+  - `wp_cuenta_subcta.srw`:
+    - `ue_subcta_grupo_rel` ahora busca el `ente` asociado a la prepaga de la subcuenta con `afs_prepagas`.
+    - Envia por `OpenWithParm` el parametro: `cuenta#subcta#vigen_desde#cuenta_deno#subcta_deno#ente`.
+  - `wp_subcta_grupo_rel.srw`:
+    - Recibe y conserva `il_ente_param`.
+    - Setea `cuenta`, `subcta`, `ente`, `cuenta_deno`, `subcta_deno`, `filtro_cuenta_os` y `filtro_subcuenta_os` al abrir/limpiar en modo parametrizado.
+    - `vigen_desde` queda editable cuando la ventana abre parametrizada desde `wp_cuenta_subcta`.
+    - Al cambiar `vigen_desde`, vuelve a reponer `cuenta`, `subcta`, `ente` y denominaciones para no perder el contexto.
+- Decision tecnica:
+  - En estos objetos el campo visual `Entidad` corresponde a la columna DW `ente`.
+  - `ente` no se graba en `SUBCTA_GRUPO_RELACIONADO`; sigue siendo dato derivado/visual, coherente con la tabla real documentada.
+- Validaciones ejecutadas:
+  - `wp_cuenta_subcta.srw` y `wp_subcta_grupo_rel.srw` preservan UTF-8 con BOM y finales LF.
+  - Ocurrencias verificadas de `il_ente_param`, `object.ente`, `afs_prepagas` y parametro `OpenWithParm`.
+  - No se modificaron SQL ni DataWindows en esta pasada.
+- Riesgo/reserva:
+  - No se compilo en PowerBuilder ni se ejecuto en runtime desde esta sesion.
+
+## 2026-06-25 - Continuidad Redmine 29934 / layout Entidad y validacion estatica de carga
+
+Resumen operativo:
+
+- Walter pidio revisar:
+  - Si al ingresar la clave en la primera DW de `wp_cuenta_subcta` se completan los datos de esa DW.
+  - Si se cargan los registros de la DW lista en `wp_subcta_grupo_rel`.
+  - Que `Entidad` no sobresalga del control en `de_subcta_grupo_rel`.
+- Limitacion:
+  - No se pudo ejecutar runtime PowerBuilder desde el entorno Linux sin `DISPLAY`, `wine` ni IDE/runtime PB.
+  - La validacion realizada fue estatica por fuente/export.
+- Validacion estatica de carga:
+  - `wp_cuenta_subcta.srw`, `ue_aceptar`:
+    - Ejecuta `wf_retorna_info_cuenta(ls_sp, lds_cuenta)` al ingresar cuenta.
+    - Si existe, llama `dw_cuentas.retrieve(dw_cuentas.object.cuenta[1], dw_cuentas.object.cuenta_tipo[1], dw_cuentas.object.razon[1], dw_cuentas.object.cuit[1], 1)`.
+    - Si devuelve filas, carga unidad y luego llama `dw_subcta.retrieve(dw_cuentas.object.cuenta[1], ls_null)`.
+  - `wp_subcta_grupo_rel.srw`, `ue_limpiar`:
+    - En modo parametrizado setea cuenta/subcuenta/ente/denominaciones.
+    - Marca filtros `filtro_cuenta_os` y `filtro_subcuenta_os` en `S`.
+    - Ejecuta `dwa_datos.of_grabar_filtros(ls_msj)`.
+    - Luego ejecuta `dw_lista.retrieve()`.
+  - `afs_subcta_grupo_rel.sql`:
+    - Consulta `SUBCTA_GRUPO_RELACIONADO`.
+    - Devuelve `cuenta`, `subcta`, `vigen_desde`, `vigen_hasta`, aliases `baja`, `domicilio`, `comprobante`, denominaciones y `ente`.
+    - Filtra por `FILTRO_CUENTA` y `FILTRO_SUBCUENTA` con `@@spid`.
+- Cambio de layout aplicado:
+  - Archivo: `/mnt/Agentes/WalterF/Swiss/UPGRADE_Plan-Master-2541_Grupos-Relacionados/de_subcta_grupo_rel.srd`.
+  - `Entidad` se bajo a la segunda linea del DataWindow editable:
+    - label `ente_t`: `x=1728`, `y=128`.
+    - campo `ente`: `x=2021`, `y=120`, `width=471`.
+  - Se bajo `Baja`, `Domicilio` y `Comprobante` a una tercera linea para evitar solapamientos.
+  - `detail.height` paso de `320` a `400`.
+  - Columnas ocultas de soporte se movieron a `y=328`.
+- Validaciones de layout:
+  - Todos los controles visibles del DW editable quedan dentro del ancho util `2894`.
+  - `ente` ahora termina en `2492`, antes terminaba fuera del ancho.
+  - `de_subcta_grupo_rel.srd` conserva UTF-8 con BOM y finales LF.

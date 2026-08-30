@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-19T22:24:59.895Z",
+  "entries": {
+    "memory:memory/2026-05-19.md:49:70": {
+      "key": "memory:memory/2026-05-19.md:49:70",
+      "path": "memory/2026-05-19.md",
+      "startLine": 49,
+      "endLine": 70,
+      "source": "memory",
+      "snippet": "- No guardar ni reproducir la contraseña SVN informada por el humano. - Validaciones de checkout: `svn info`, `svn update`, `svn status` OK. - Para el Redmine `29797`, se trabajó sobre `dgiuseppe-Prevencion-trunk` con usuario Redmine `dgiuseppe`. - Se actualizó la rama `dgiuseppe-Prevencion-trunk` a revisión `15554` antes del análisis inicial. - Interpretación de `backend/tablas`: - Contiene snapshot de estructura SQL Server. - `extraccion-tables-definitions.sql` extrae metadata desde `sys.tables`, `sys.columns`, PKs y FKs. - `tables-definitions.csv` contiene `1115` tablas y `12000` columnas. - El CSV informa por columna: esquema, tabla, orden, campo, tipo, longitud, precisión, e",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T15:16:57.691Z",
+      "lastRecalledAt": "2026-05-19T15:16:57.691Z",
+      "queryHashes": [
+        "961ba44696ae"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "dgiuseppe-prevencion-trunk",
+        "backend/tablas",
+        "sys.tables",
+        "sys.columns",
+        "tables-definitions.csv",
+        "guardar",
+        "reproducir",
+        "contraseña"
+      ]
+    },
+    "memory:memory/2026-05-19.md:83:112": {
+      "key": "memory:memory/2026-05-19.md:83:112",
+      "path": "memory/2026-05-19.md",
+      "startLine": 83,
+      "endLine": 112,
+      "source": "memory",
+      "snippet": "- `wp_expe_compro_externo.srw` - `wp_selexp_sup_gn_compro_deb.srw` - `wp_selexp_sup_gn_nota_db.srw` - `wp_puntos.srw` - `wp_entes_puntos.srw` - `wp_ente_punto.srw` - `wp_bloqueo_puntos.srw` - `wp_factu_aporte_empresas.srw` - `wp_ver_ctacte.srw` - `wp_ver_ctacte_empresas.srw` - `wp_compro_cae_solicitar.srw` - `wp_compro_cae_solicitar_ws.srw` - `wp_compro_cae_cons.srw` - `wp_compro_cae_resolicitar_ws.srw` - `wp_fac_proceso_mensual.srw` - `wp_factu_contratos.srw` - `wp_gene_ni_contra.srw` - `wp_generacion_di.srw` - `wp_estado_wsfe.srw` - También quedan impactados SQLs que cortan fijo `SUBSTRING(compro_nro,2,4)` y `SUBSTRING(compro_nro,6,8)`, especialmente C",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T15:16:57.691Z",
+      "lastRecalledAt": "2026-05-19T15:16:57.691Z",
+      "queryHashes": [
+        "961ba44696ae"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "wp-expe-compro-externo.srw",
+        "wp-selexp-sup-gn-compro-deb.srw",
+        "wp-selexp-sup-gn-nota-db.srw",
+        "wp-puntos.srw",
+        "wp-entes-puntos.srw",
+        "wp-ente-punto.srw",
+        "wp-bloqueo-puntos.srw",
+        "wp-factu-aporte-empresas.srw"
+      ]
+    },
+    "memory:memory/2026-05-19.md:28:53": {
+      "key": "memory:memory/2026-05-19.md:28:53",
+      "path": "memory/2026-05-19.md",
+      "startLine": 28,
+      "endLine": 53,
+      "source": "memory",
+      "snippet": "- `FP | L | Factura Electronica de Credito MiPyme | 1 | N` - `FV | L | Cuenta de Venta y Liquido Producto | 1 | N` - `LC | L | Liquidacion | 1 | N` - `NC | L | Nota de Crédito | -1 | N` - `ND | L | Nota de Débito | 1 | N` - `NI | I | Nota de Credito Interna | -1 | N` - `NL | L | Nota de Credito de Liquidacion | -1 | N` - `NV | L | Nota de Credito de Cuenta de Venta y Liquido Producto | -1 | N` - `OC | L | Otros Comprobantes (No cumplen RG.1415) | 1 | N` - `OP | I | Ordenes de Pago | 1 | S` - `RA | I | Reversión de Aportes | -1 | N` - `RC | L | Recibo | -1 | S` - `RE | L | Recibo Prestador | 1 | N` - `TK | L | Ticket Factura A | 1 | N` - Total vigente: `27`. -",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T15:16:57.691Z",
+      "lastRecalledAt": "2026-05-19T22:24:59.895Z",
+      "queryHashes": [
+        "961ba44696ae",
+        "b292e9e41a0a"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "rg.1415",
+        "factura",
+        "electronica",
+        "credito",
+        "mipyme",
+        "cuenta",
+        "venta",
+        "liquido"
+      ]
+    },
+    "memory:memory/2026-05-19.md:1:34": {
+      "key": "memory:memory/2026-05-19.md:1:34",
+      "path": "memory/2026-05-19.md",
+      "startLine": 1,
+      "endLine": 34,
+      "source": "memory",
+      "snippet": "# 2026-05-19 - Memoria operativa ## Prevencion / Redmine 29797 / SVN dgiuseppe-Prevencion-trunk - Se agregó un profile de base de datos llamado `prevencion_entrega`. - Motor: MS SQL Server. - Host: `172.16.10.123`. - Puerto: `1433`. - Base: `prevencion_entrega`. - Usuario: `sa`. - Notas: Base de datos de Prevención. - No guardar ni reproducir el password informado por el humano. - Se probó la conexión del profile `prevencion_entrega` y se listaron tipos de comprobantes vigentes de `dbo.compro_tipos`. - Tipos vigentes detectados en `prevencion_entrega`: - `AC | I | Anticipo Clientes | 1 | N` - `AD | I | Aportes Directos | 1 | N` - `AI | I | Nota Crédito Interna Ajuste IN",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T15:16:57.691Z",
+      "lastRecalledAt": "2026-05-19T15:16:57.691Z",
+      "queryHashes": [
+        "961ba44696ae"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "dgiuseppe-prevencion-trunk",
+        "prevencion-entrega",
+        "172.16.10.123",
+        "dbo.compro-tipos",
+        "memoria",
+        "operativa",
+        "prevencion",
+        "redmine"
+      ]
+    },
+    "memory:memory/2026-05-19.md:107:128": {
+      "key": "memory:memory/2026-05-19.md:107:128",
+      "path": "memory/2026-05-19.md",
+      "startLine": 107,
+      "endLine": 128,
+      "source": "memory",
+      "snippet": "- Mapeo correcto de aplicativo para el documento: - `prestaciones`: objeto `application` `prestaciones.sra`; abre `wf_mainpresta` y carga el menú `m_main`. - `afilia`: objeto `application` `afilia.sra`; abre `wf_main_afi` y carga el menú `m_afilia`. - Commits SVN posteriores del documento: - Revisión `15556`: `#29797 - Documenta impacto y rutas de ventanas`. - Revisión `15557`: `#29797 - Ajusta aplicativos por objeto application`. - Estado final del trabajo documental: `redmine/29797/29797.md` commiteado en revisión `15557` y working copy SVN limpia. - Validaciones finales: `svn status` sin pendientes, `svn info` del archivo con `Last Changed Rev: 15557`, archivo sin BOM y finales `L",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T22:24:59.895Z",
+      "lastRecalledAt": "2026-05-19T22:24:59.895Z",
+      "queryHashes": [
+        "b292e9e41a0a"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "prestaciones.sra",
+        "wf-mainpresta",
+        "m-main",
+        "afilia.sra",
+        "wf-main-afi",
+        "m-afilia",
+        "redmine/29797/29797.md",
+        "mapeo"
+      ]
+    },
+    "memory:memory/2026-05-19.md:83:111": {
+      "key": "memory:memory/2026-05-19.md:83:111",
+      "path": "memory/2026-05-19.md",
+      "startLine": 83,
+      "endLine": 111,
+      "source": "memory",
+      "snippet": "- `wp_expe_compro_externo.srw` - `wp_selexp_sup_gn_compro_deb.srw` - `wp_selexp_sup_gn_nota_db.srw` - `wp_puntos.srw` - `wp_entes_puntos.srw` - `wp_ente_punto.srw` - `wp_bloqueo_puntos.srw` - `wp_factu_aporte_empresas.srw` - `wp_ver_ctacte.srw` - `wp_ver_ctacte_empresas.srw` - `wp_compro_cae_solicitar.srw` - `wp_compro_cae_solicitar_ws.srw` - `wp_compro_cae_cons.srw` - `wp_compro_cae_resolicitar_ws.srw` - `wp_fac_proceso_mensual.srw` - `wp_factu_contratos.srw` - `wp_gene_ni_contra.srw` - `wp_generacion_di.srw` - `wp_estado_wsfe.srw` - También quedan impactados SQLs que cortan fijo `SUBSTRING(compro_nro,2,4)` y `SUBSTRING(compro_nro,6,8)`, especialmente C",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T22:24:59.895Z",
+      "lastRecalledAt": "2026-05-19T22:24:59.895Z",
+      "queryHashes": [
+        "b292e9e41a0a"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "wp-expe-compro-externo.srw",
+        "wp-selexp-sup-gn-compro-deb.srw",
+        "wp-selexp-sup-gn-nota-db.srw",
+        "wp-puntos.srw",
+        "wp-entes-puntos.srw",
+        "wp-ente-punto.srw",
+        "wp-bloqueo-puntos.srw",
+        "wp-factu-aporte-empresas.srw"
+      ]
+    },
+    "memory:memory/2026-05-19.md:64:93": {
+      "key": "memory:memory/2026-05-19.md:64:93",
+      "path": "memory/2026-05-19.md",
+      "startLine": 64,
+      "endLine": 93,
+      "source": "memory",
+      "snippet": "- Interpretación de `backend/tablas`. - Tablas críticas detectadas: `compro_tipos`, `compro_tipos_afip`, `puntos`, `entes_puntos`, `compro_cae_solicitud`. - Riesgos y puntos a confirmar. - Commit SVN realizado del documento inicial: - Revisión: `15555`. - Archivo: `redmine/29797/29797.md`. - Mensaje: `#29797 - Documenta interpretacion inicial`. - Validaciones: UTF-8 sin BOM, finales LF, `svn commit` OK, `svn status` sin pendientes, `svn info` del archivo con `Last Changed Rev: 15555`. - Luego se analizó el impacto del cambio de label `CAE` a `CAE/CAEA` y del tamaño del punto de venta de 4 a 5 caracteres. - Conclusión técnica del análisis CAE/CAEA: - El cambio de label `CAE` a",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-19T22:24:59.895Z",
+      "lastRecalledAt": "2026-05-19T22:24:59.895Z",
+      "queryHashes": [
+        "b292e9e41a0a"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "backend/tablas",
+        "compro-tipos",
+        "compro-tipos-afip",
+        "entes-puntos",
+        "compro-cae-solicitud",
+        "redmine/29797/29797.md",
+        "utf-8",
+        "cae/caea"
+      ]
+    }
+  }
+}

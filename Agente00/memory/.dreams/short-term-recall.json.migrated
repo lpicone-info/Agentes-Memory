@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-21T21:07:55.379Z",
+  "entries": {
+    "memory:memory/2026-05-19.md:1:39": {
+      "key": "memory:memory/2026-05-19.md:1:39",
+      "path": "memory/2026-05-19.md",
+      "startLine": 1,
+      "endLine": 39,
+      "source": "memory",
+      "snippet": "# Memoria operativa - 2026-05-19 ## Cierre de jornada El usuario indico: \"por hoy terminamos\" y pidio guardar todo en memoria persistente. ## Repositorio operativo Repositorio trabajado: - Nombre logico: `lpicone-info-NemeSys` - Ruta local: `/home/luispicone/.openclaw/workspace/git/lpicone-info-NemeSys` - Remoto: `git@github.com:lpicone-info/NemeSys.git` - Branch: `main` Acciones Git realizadas durante la jornada: - Se hizo commit de la actualizacion de la tarea 7 Google Drive. - El primer push fallo por autenticacion SSH porque Git no estaba usando la clave dedicada. - Se valido la clave `ssh-keys/NemeSys/github_nemesys_ed25519` contra GitHub. - El push fue rechazado luego por remoto",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-20T19:01:30.771Z",
+      "lastRecalledAt": "2026-05-20T19:01:30.771Z",
+      "queryHashes": [
+        "d8fc22d0b6ad"
+      ],
+      "recallDays": [
+        "2026-05-20"
+      ],
+      "conceptTags": [
+        "lpicone-info-nemesys",
+        "home/luispicone",
+        "github.com",
+        "lpicone-info/nemesys.git",
+        "memoria",
+        "operativa",
+        "cierre",
+        "jornada"
+      ]
+    },
+    "memory:memory/2026-05-15-cierre-tareas-nemesys-github-unidad-red.md:72:122": {
+      "key": "memory:memory/2026-05-15-cierre-tareas-nemesys-github-unidad-red.md:72:122",
+      "path": "memory/2026-05-15-cierre-tareas-nemesys-github-unidad-red.md",
+      "startLine": 72,
+      "endLine": 122,
+      "source": "memory",
+      "snippet": "- Recomendado: pipeline autorizado con ingreso de link/archivo, descarga autorizada, extraccion de audio, transcripcion, diarizacion opcional, extraccion de frames, OCR, analisis visual y documentacion Markdown accionable. - Debe separar evidencia, inferencias, dudas y recomendaciones. - Requiere consentimiento y acceso legitimo al video. ## Repositorio GitHub de NemeSys Luis pidio conectar a NemeSys con un repositorio GitHub propio. Se genero una clave SSH dedicada para GitHub y Luis incorporo la clave publica en GitHub. Luego se uso la skill `git-clone` para clonar: `git@github.com:lpicone-info/NemeSys.git` El repo quedo clonado y validado como: `~/.openclaw/workspace/git/lpicone-in",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-20T19:01:30.771Z",
+      "lastRecalledAt": "2026-05-20T19:01:30.771Z",
+      "queryHashes": [
+        "d8fc22d0b6ad"
+      ],
+      "recallDays": [
+        "2026-05-20"
+      ],
+      "conceptTags": [
+        "link/archivo",
+        "git-clone",
+        "github.com",
+        "lpicone-info/nemesys.git",
+        "cierre",
+        "tareas",
+        "nemesys",
+        "github"
+      ]
+    },
+    "memory:memory/2026-05-20.md:14:23": {
+      "key": "memory:memory/2026-05-20.md:14:23",
+      "path": "memory/2026-05-20.md",
+      "startLine": 14,
+      "endLine": 23,
+      "source": "memory",
+      "snippet": "- Validacion de no exposicion: se verifico que la passphrase en claro no quedara en `SSH-AGENTES.md` ni en `~/.openclaw/secrets/ssh-agent`. - El helper cargo correctamente las 5 identidades SSH en el `ssh-agent`. - Resultado de presencia de `docu-video`: - Agente00: OK, SHA `733f05b124ff08514cb81db129598dc983f80bce5e703b99fd9c526e97d04443` - Agente01: NO - Agente02: NO - Agente03: NO - Agente04: OK, SHA `733f05b124ff08514cb81db129598dc983f80bce5e703b99fd9c526e97d04443` - Conclusión: acceso SSH operativo y documentado; `docu-video` falta en Agente01, Agente02 y Agente03.",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "ssh-agentes.md",
+        "openclaw/secrets/ssh-agent",
+        "ssh-agent",
+        "docu-video",
+        "validacion",
+        "exposicion",
+        "verifico",
+        "passphrase"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:1:25": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:1:25",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 1,
+      "endLine": 25,
+      "source": "memory",
+      "snippet": "# 2026-05-14 - Cierre operativo: reglas, auditorías Agente01 y skills Git/SVN Resumen persistente de lo trabajado durante la jornada. ## Regla 25 - RTRIM en SQL Se revisó la Regla 25: > En toda creación o modificación de scripts SQL se deben respetar estas consignas obligatorias: no usar finalizador de punto y coma (`;`) en las sentencias SQL y nunca usar la función `RTRIM`. Luis aclaró el motivo operativo: en SQL Server, los campos `CHAR(n)` rellenan con espacios a la derecha cuando el dato tiene menor longitud. Los agentes, al ver esos espacios, tendían a usar `RTRIM` compulsivamente. El criterio acordado fue que esos espacios pueden ser consecuencia normal del tipo `CHAR`, y no deben",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "git/svn",
+        "cierre",
+        "operativo",
+        "reglas",
+        "skills",
+        "agentes.md",
+        "auditorías",
+        "agente01"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:122:142": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:122:142",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 122,
+      "endLine": 142,
+      "source": "memory",
+      "snippet": "Luego se copió la skill `git-delete` a Agente01, Agente02, Agente03 y Agente04. Checksum validado en todos: `a5710aacaca08e208b49b2ed0499651180012f564964cfe67becf1b72d7a9eab` Validaciones de la skill en todos los agentes: - UTF-8 OK. - Sin BOM. - Finales LF. - No existía versión previa en esos agentes. ## Estado final de la jornada - Regla 23 quedó actualizada y sincronizada en todos los agentes. - Regla 28 quedó pendiente, sin modificar. - `git-delete` quedó copiada a todos los agentes. - Se realizaron auditorías puntuales sobre Agente01 por backup SVN y estimaciones de horas humanas. - Luis cerró la jornada indicando que por hoy terminamos.",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "backup",
+        "git-delete",
+        "utf-8",
+        "cierre",
+        "operativo",
+        "reglas",
+        "skills",
+        "agentes.md"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:22:39": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:22:39",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 22,
+      "endLine": 39,
+      "source": "memory",
+      "snippet": "- Archivo detectado: `~/.openclaw/workspace/backups/srmontenegro-Version104-Afilmed-SolicitudesAutomaticas_20260514T140357Z.tar.gz`. - Tamaño aproximado: `329M`. - El filesystem no estaba en riesgo inmediato, pero se concluyó que es una práctica operativamente mala: duplica contenido SVN dentro del ambiente del agente, consume disco y queda fuera de una política clara de retención. Conclusión persistente: los agentes no deberían crear backups completos de working copies dentro de su ambiente salvo autorización explícita y política de retención definida. ## Auditoría Agente01 - estimaciones de horas humanas Luis pidió revisar sesiones de Agente01 del día buscando textos que indujeran al ag",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "backup",
+        "backups",
+        "cierre",
+        "operativo",
+        "reglas",
+        "skills",
+        "agentes.md",
+        "archivo"
+      ]
+    },
+    "memory:memory/2026-05-20.md:1:20": {
+      "key": "memory:memory/2026-05-20.md:1:20",
+      "path": "memory/2026-05-20.md",
+      "startLine": 1,
+      "endLine": 20,
+      "source": "memory",
+      "snippet": "# Memoria operativa - 2026-05-20 ## SSH agentes y skill docu-video - Contexto: Luis pidio verificar si la skill `docu-video` estaba disponible en todos los agentes. - Bootstrap operativo ejecutado previamente conforme `AGENTS.md`: lectura de `REGLAS.md` en bloques, `REPOSITORIOS.md` y `DB_PROFILE.md`. - Inventario local: en esta instalacion solo existe el agente local `main` bajo `~/.openclaw/agents`; la skill `docu-video` existe en el workspace global como `workspace/skills/docu-video/SKILL.md`. - Inventario operativo remoto: Agente00, Agente01, Agente02, Agente03 y Agente04. - Problema detectado: SSH estaba bloqueado porque las claves privadas requerian passphrase y el `ssh-agent` activo",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "docu-video",
+        "agents.md",
+        "reglas.md",
+        "repositorios.md",
+        "db-profile.md",
+        "openclaw/agents",
+        "ssh-agent",
+        "memoria"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:71:101": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:71:101",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 71,
+      "endLine": 101,
+      "source": "memory",
+      "snippet": "Luego se copió `REGLAS.md` actualizado a Agente01, Agente02, Agente03 y Agente04 con backup previo en cada host. Checksum final validado en todos los agentes: `bd4cadc70a0a521f0c24d6e912cd22b7e204873f1a3a189d00fd712c9de5729f` ## Regla 28 - Validación owner Discord para SVN Se analizó una posible ampliación de Regla 28 para evitar que usuarios de Discord modifiquen working copies SVN de otros usuarios. Criterio explorado: - Comparar el usuario Discord recibido en metadata del mensaje contra el owner/usuario inferido de la working copy registrada en `REPOSITORIOS.md`. - Usar normalización de nombres y decisión binaria `PASA` / `NO PASA`. - Aplicar inteligencia probabilística para casos c",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "backup",
+        "reglas.md",
+        "owner/usuario",
+        "repositorios.md",
+        "cierre",
+        "operativo",
+        "reglas",
+        "skills"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:51:80": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:51:80",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 51,
+      "endLine": 80,
+      "source": "memory",
+      "snippet": "Todo pedido de crear, conectar, clonar, bajar, preparar, hacer checkout, vincular, registrar, incorporar o dejar disponible un repositorio o working copy debe tratarse obligatoriamente como una operación de alta controlada de repositorio, aunque el humano no mencione explícitamente una skill. El agente no debe realizar clones, checkouts, conexiones ni registros manuales de repositorios por fuera de la skill correspondiente. Para repositorios SVN o working copies SVN debe usarse obligatoriamente la skill `svn-checkout`. Para repositorios Git debe usarse obligatoriamente la skill `git-clone` cuando aplique. La skill correspondiente es responsable de solicitar los datos necesarios, validar",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "svn-checkout",
+        "git-clone",
+        "cierre",
+        "operativo",
+        "reglas",
+        "skills",
+        "agentes.md",
+        "todo"
+      ]
+    },
+    "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:94:136": {
+      "key": "memory:memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md:94:136",
+      "path": "memory/2026-05-14-cierre-operativo-reglas-skills-agentes.md",
+      "startLine": 94,
+      "endLine": 136,
+      "source": "memory",
+      "snippet": "- `origin.label`: contiene usuario e ID. - `origin.from`: `discord:<id>`. - `deliveryContext.to`: `user:<id>`. Luis pidió no complicar el criterio con exceso de distinciones y volver a la idea original: usar el usuario que llega desde Discord/OpenClaw y cruzarlo con el usuario/owner del repositorio. ## Skill `git-delete` Luis agregó una nueva skill `git-delete`, equivalente conceptual a `svn-delete` pero para repositorios Git. Se leyó y revisó: `~/.openclaw/workspace/skills/git-delete/SKILL.md` Conclusión dada: - Skill aprobada como usable. - Alineada con `git-clone`. - Cumple función equivalente a `svn-delete` para Git. - No se objetó nada que implicara cambios en `svn-delete`, por p",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "origin.label",
+        "origin.from",
+        "deliverycontext.to",
+        "discord/openclaw",
+        "usuario/owner",
+        "git-delete",
+        "svn-delete",
+        "git-clone"
+      ]
+    },
+    "memory:memory/2026-05-18.md:17:32": {
+      "key": "memory:memory/2026-05-18.md:17:32",
+      "path": "memory/2026-05-18.md",
+      "startLine": 17,
+      "endLine": 32,
+      "source": "memory",
+      "snippet": "- Despues de que el usuario provee link/ruta del video, carpeta destino y demas informacion solicitada, la skill debe validar integridad reproducible del video antes de audio/frames/transcripcion/DOCX. - La validacion usa `ffprobe` para duracion declarada y `ffmpeg -xerror ... -f null - -progress pipe:1` para recorrer decodificacion completa sin salida. - Si falla, informa duracion declarada, ultimo timestamp valido, minuto/segundo aproximado de falla y resumen de errores tecnicos. - Si falla, aborta la skill, no genera DOCX y limpia solo artefactos/carpetas locales creados exclusivamente por esa ejecucion. - Nunca borra informacion remota ni archivos originales. - Si el video es",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "link/ruta",
+        "audio/frames/transcripcion/docx",
+        "minuto/segundo",
+        "artefactos/carpetas",
+        "despues",
+        "usuario",
+        "provee",
+        "link"
+      ]
+    },
+    "memory:memory/2026-05-18.md:31:44": {
+      "key": "memory:memory/2026-05-18.md:31:44",
+      "path": "memory/2026-05-18.md",
+      "startLine": 31,
+      "endLine": 44,
+      "source": "memory",
+      "snippet": "- El usuario aclaro que \"retomemos el trabajo de la skill docu-video\" significaba ponerse en contexto para seguir mejorandola, no ejecutarla ni modificarla sin pedido explicito. - Hubo una modificacion previa no solicitada en `skills/docu-video/SKILL.md` agregando un guardrail de \"Modo mantenimiento\"; el usuario la rechazo como inutil. - Esa modificacion fue revertida y se valido que `skills/docu-video/SKILL.md` quedara identica a la version del Agente04 de ese momento. - SHA de esa validacion previa local/Agente04: `27b3ea1c73713edceef72e6fbb8690072d4effd2228b173b6deebe6ef6ca5ffc`. ## Repositorios - Repositorio registrado informado al usuario: - Nombre: `lpicone-info-NemeSys` - Tipo: G",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-21T21:07:55.379Z",
+      "lastRecalledAt": "2026-05-21T21:07:55.379Z",
+      "queryHashes": [
+        "518fe23a9840"
+      ],
+      "recallDays": [
+        "2026-05-21"
+      ],
+      "conceptTags": [
+        "docu-video",
+        "skills/docu-video/skill.md",
+        "local/agente04",
+        "lpicone-info-nemesys",
+        "usuario",
+        "aclaro",
+        "retomemos",
+        "trabajo"
+      ]
+    }
+  }
+}
