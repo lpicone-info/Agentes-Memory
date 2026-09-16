@@ -457,6 +457,36 @@ def main():
     print(f"Intervenciones: {len(mensajes)}")
     print(f"Memoria generada: {salida}")
 
+    # Purgar secretos del archivo generado
+    import subprocess
+
+    purgador = (
+        Path(__file__).resolve().parent
+        / "purga_secretos_memoria_md.py"
+    )
+
+    if not purgador.is_file():
+        print(
+            f"ERROR | No se encontró el purgador: {purgador}",
+            file=sys.stderr
+        )
+        raise SystemExit(1)
+
+    resultado_purga = subprocess.run(
+        [
+            sys.executable,
+            str(purgador),
+            str(salida)
+        ]
+    )
+
+    if resultado_purga.returncode != 0:
+        print(
+            f"ERROR | Falló la purga de secretos: {salida}",
+            file=sys.stderr
+        )
+        raise SystemExit(1)
+
 
 if __name__ == "__main__":
     main()
