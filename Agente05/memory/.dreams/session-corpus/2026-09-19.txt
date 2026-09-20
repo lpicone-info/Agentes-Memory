@@ -1,0 +1,2 @@
+[main/sessions/main/5efc580d-c423-4ccc-a6fa-97b3d0d58095#L18] User: /codex status
+[main/sessions/main/5efc580d-c423-4ccc-a6fa-97b3d0d58095#L19] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente05＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 51% left ⏱5d MCP servers: 1 Skills: 6
