@@ -2,89 +2,372 @@
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-TZ_NAME = "America/Argentina/Buenos_Aires"
 
-SESSIONS_JSON = (
+TZ = ZoneInfo("America/Argentina/Buenos_Aires")
+
+AGENT_ID = "main"
+
+GENERATOR = (
     Path.home()
-    / ".openclaw/agents/main/sessions/sessions.json"
+    / ".openclaw/workspace/memory/genera_memoria_md.py"
 )
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-GENERADOR = SCRIPT_DIR / "genera_memoria_md.py"
+RC_OK = 0
+RC_SIN_ACTIVIDAD = 3
 
 
-def cargar_sessions():
-    if not SESSIONS_JSON.exists():
-        raise FileNotFoundError(
-            f"No existe el archivo: {SESSIONS_JSON}"
+def localizar_openclaw():
+    candidatos = [
+        shutil.which("openclaw"),
+        str(Path.home() / ".npm-global/bin/openclaw"),
+        str(Path.home() / ".local/bin/openclaw"),
+        "/usr/local/bin/openclaw",
+        "/usr/bin/openclaw",
+    ]
+
+    for candidato in candidatos:
+
+        if (
+            candidato
+            and Path(candidato).is_file()
+            and os.access(candidato, os.X_OK)
+        ):
+            return candidato
+
+    raise RuntimeError(
+        "No se encontró el ejecutable 'openclaw'."
+    )
+
+
+def ejecutar_json(cmd, timeout=60):
+
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+    if proc.returncode != 0:
+
+        detalle = (
+            proc.stderr
+            or proc.stdout
+            or ""
+        ).strip()
+
+        raise RuntimeError(
+            f"Comando falló con código "
+            f"{proc.returncode}: "
+            f"{detalle or 'sin detalle'}"
         )
 
-    with SESSIONS_JSON.open(
-        encoding="utf-8",
-        errors="ignore"
-    ) as f:
-        return json.load(f)
+    salida = proc.stdout.strip()
+
+    if not salida:
+
+        raise RuntimeError(
+            "El comando no devolvió salida JSON."
+        )
+
+    try:
+
+        return json.loads(salida)
+
+    except json.JSONDecodeError as exc:
+
+        raise RuntimeError(
+            f"No se pudo interpretar "
+            f"la salida JSON: {exc}"
+        ) from exc
 
 
-def obtener_usuarios_googlechat(sessions):
+def listar_sesiones(openclaw):
+
+    return ejecutar_json(
+        [
+            openclaw,
+            "sessions",
+            "--agent",
+            AGENT_ID,
+            "--limit",
+            "all",
+            "--json",
+        ],
+        timeout=60,
+    )
+
+
+def obtener_metadata_chat(
+    openclaw,
+    session_key,
+):
+
+    params = json.dumps(
+        {
+            "sessionKey": session_key,
+            "limit": 1,
+        },
+        separators=(",", ":"),
+    )
+
+    data = ejecutar_json(
+        [
+            openclaw,
+            "gateway",
+            "call",
+            "chat.history",
+            "--params",
+            params,
+            "--timeout",
+            "60000",
+            "--json",
+        ],
+        timeout=70,
+    )
+
+    return data.get("sessionInfo") or {}
+
+
+def normalizar_user_id(valor):
+
+    if not valor:
+        return None
+
+    valor = str(valor).strip()
+
+    if valor.startswith("googlechat:"):
+
+        valor = valor[
+            len("googlechat:"):
+        ]
+
+    if valor.startswith("users/"):
+        return valor
+
+    return None
+
+
+def user_id_desde_participantes(
+    session,
+):
+
+    for participante in (
+        session.get("participants")
+        or []
+    ):
+
+        if not isinstance(
+            participante,
+            dict,
+        ):
+            continue
+
+        identity = (
+            participante.get("identity")
+            or {}
+        )
+
+        if (
+            identity.get("pluginId")
+            != "googlechat"
+        ):
+            continue
+
+        user_id = normalizar_user_id(
+            identity.get("id")
+        )
+
+        if user_id:
+            return user_id
+
+    return None
+
+
+def obtener_usuarios_googlechat(
+    openclaw,
+    sessions_payload,
+):
+
     usuarios = {}
 
-    for session_key, data in sessions.items():
+    for session in (
+        sessions_payload.get("sessions")
+        or []
+    ):
 
-        if not isinstance(data, dict):
+        if not isinstance(
+            session,
+            dict,
+        ):
             continue
 
-        origin = data.get("origin") or {}
+        session_key = session.get("key")
 
-        origen_usuario = origin.get("from")
-
-        if not origen_usuario:
+        if not session_key:
             continue
 
-        if not origen_usuario.startswith("googlechat:users/"):
+        # Solo conversaciones directas
+        # de Google Chat.
+        if (
+            ":googlechat:direct:"
+            not in session_key
+        ):
             continue
 
-        user_id = origen_usuario[len("googlechat:"):]
+        # Primer intento:
+        # obtener el usuario desde
+        # participants de sessions.list.
+        user_id = (
+            user_id_desde_participantes(
+                session
+            )
+        )
+
+        nombre = None
+
+        # chat.history nos da
+        # sessionInfo completo,
+        # incluyendo origin.from
+        # y displayName.
+        try:
+
+            info = obtener_metadata_chat(
+                openclaw,
+                session_key,
+            )
+
+        except Exception:
+
+            info = {}
+
+        origin = (
+            info.get("origin")
+            or {}
+        )
+
+        user_id_metadata = (
+            normalizar_user_id(
+                origin.get("from")
+            )
+        )
+
+        if user_id_metadata:
+            user_id = user_id_metadata
+
+        nombre = (
+            info.get("displayName")
+            or origin.get("label")
+            or user_id
+        )
+
+        if not user_id:
+            continue
 
         if user_id not in usuarios:
+
             usuarios[user_id] = {
-                "nombre": origin.get("label") or user_id,
-                "sesiones": []
+                "nombre": (
+                    nombre
+                    or user_id
+                ),
+                "sesiones": [],
             }
 
-        usuarios[user_id]["sesiones"].append(session_key)
+        elif (
+            nombre
+            and usuarios[user_id]["nombre"]
+            == user_id
+        ):
+
+            usuarios[user_id][
+                "nombre"
+            ] = nombre
+
+        usuarios[user_id][
+            "sesiones"
+        ].append(session_key)
 
     return usuarios
 
 
-def ejecutar_generador(user_id, fecha):
-    resultado = subprocess.run(
+def ejecutar_generador(
+    user_id,
+    fecha,
+):
+
+    if not GENERATOR.is_file():
+
+        return (
+            127,
+            "",
+            (
+                "No existe el generador: "
+                f"{GENERATOR}"
+            ),
+        )
+
+    proc = subprocess.run(
         [
-            sys.executable,
-            str(GENERADOR),
+            str(GENERATOR),
             user_id,
-            fecha
+            fecha,
         ],
-        capture_output=True,
-        text=True
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
     )
 
-    return resultado
+    return (
+        proc.returncode,
+        proc.stdout.strip(),
+        proc.stderr.strip(),
+    )
+
+
+def parsear_fecha(valor):
+
+    if valor:
+
+        try:
+
+            return datetime.strptime(
+                valor,
+                "%Y-%m-%d",
+            ).date().isoformat()
+
+        except ValueError:
+
+            raise SystemExit(
+                "La fecha debe tener "
+                "formato YYYY-MM-DD."
+            )
+
+    return (
+        datetime.now(TZ)
+        .date()
+        .isoformat()
+    )
 
 
 def main():
 
     parser = argparse.ArgumentParser(
         description=(
-            "Genera automáticamente las memorias Markdown "
-            "de todos los usuarios de Google Chat que hayan "
-            "tenido actividad durante una fecha."
+            "Genera memorias Markdown "
+            "diarias para usuarios "
+            "de Google Chat."
         )
     )
 
@@ -92,114 +375,140 @@ def main():
         "fecha",
         nargs="?",
         help=(
-            "Fecha a procesar en formato YYYY-MM-DD. "
-            "Si se omite, se procesa el día actual."
-        )
+            "Fecha a procesar en "
+            "formato YYYY-MM-DD. "
+            "Por defecto: hoy."
+        ),
     )
 
     args = parser.parse_args()
 
-    if args.fecha:
-        try:
-            datetime.strptime(
-                args.fecha,
-                "%Y-%m-%d"
-            )
-        except ValueError:
-            print(
-                "ERROR: la fecha debe tener formato YYYY-MM-DD.",
-                file=sys.stderr
-            )
-            sys.exit(1)
-
-        fecha = args.fecha
-
-    else:
-        fecha = datetime.now(
-            ZoneInfo(TZ_NAME)
-        ).strftime("%Y-%m-%d")
-
-    if not GENERADOR.exists():
-        print(
-            f"ERROR: no existe el generador: {GENERADOR}",
-            file=sys.stderr
-        )
-        sys.exit(2)
+    fecha = parsear_fecha(
+        args.fecha
+    )
 
     try:
-        sessions = cargar_sessions()
-        usuarios = obtener_usuarios_googlechat(sessions)
 
-    except Exception as e:
-        print(
-            f"ERROR: {e}",
-            file=sys.stderr
+        openclaw = (
+            localizar_openclaw()
         )
-        sys.exit(3)
 
-    if not usuarios:
-        print("No se encontraron usuarios directos de Google Chat.")
-        sys.exit(0)
+        sessions_payload = (
+            listar_sesiones(
+                openclaw
+            )
+        )
 
-    generadas = []
-    sin_actividad = []
-    errores = []
+        usuarios = (
+            obtener_usuarios_googlechat(
+                openclaw,
+                sessions_payload,
+            )
+        )
 
-    print(f"Fecha procesada: {fecha}")
-    print(f"Usuarios Google Chat detectados: {len(usuarios)}")
+    except Exception as exc:
+
+        print(
+            "ERROR | "
+            "No se pudieron obtener "
+            "las sesiones de OpenClaw: "
+            f"{exc}"
+        )
+
+        return 1
+
+    print(
+        f"Fecha procesada: {fecha}"
+    )
+
+    print(
+        "Usuarios Google Chat "
+        f"detectados: {len(usuarios)}"
+    )
+
     print()
 
-    for user_id, datos in sorted(usuarios.items()):
+    generadas = 0
+    sin_actividad = 0
+    errores = 0
 
-        nombre = datos["nombre"]
+    for user_id in sorted(
+        usuarios,
+        key=lambda uid: (
+            usuarios[uid]["nombre"]
+            or uid
+        ).lower(),
+    ):
 
-        resultado = ejecutar_generador(
-            user_id,
-            fecha
+        nombre = (
+            usuarios[user_id][
+                "nombre"
+            ]
+            or user_id
         )
 
-        if resultado.returncode == 0:
-
-            generadas.append(
-                (user_id, nombre)
+        rc, stdout, stderr = (
+            ejecutar_generador(
+                user_id,
+                fecha,
             )
+        )
+
+        if rc == RC_OK:
+
+            generadas += 1
 
             print(
-                f"OK   | {nombre} | {user_id}"
+                f"OK | "
+                f"{nombre} | "
+                f"{user_id}"
             )
 
-        elif resultado.returncode == 3:
+        elif rc == RC_SIN_ACTIVIDAD:
 
-            sin_actividad.append(
-                (user_id, nombre)
-            )
+            sin_actividad += 1
 
         else:
 
-            mensaje = (
-                resultado.stderr.strip()
-                or resultado.stdout.strip()
-                or f"código {resultado.returncode}"
-            )
+            errores += 1
 
-            errores.append(
-                (user_id, nombre, mensaje)
+            detalle = (
+                stderr
+                or stdout
+                or (
+                    "código de salida "
+                    f"{rc}"
+                )
             )
 
             print(
-                f"ERROR | {nombre} | {user_id} | {mensaje}"
+                f"ERROR | "
+                f"{nombre} | "
+                f"{user_id} | "
+                f"{detalle}"
             )
 
     print()
-    print("Resumen")
-    print("-------")
-    print(f"Memorias generadas: {len(generadas)}")
-    print(f"Usuarios sin actividad: {len(sin_actividad)}")
-    print(f"Errores: {len(errores)}")
 
-    if errores:
-        sys.exit(4)
+    print("Resumen")
+
+    print(
+        "Memorias generadas: "
+        f"{generadas}"
+    )
+
+    print(
+        "Usuarios sin actividad: "
+        f"{sin_actividad}"
+    )
+
+    print(
+        "Errores: "
+        f"{errores}"
+    )
+
+    return 1 if errores else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
