@@ -2,21 +2,93 @@
 
 import argparse
 import json
+import os
+import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+
 TZ_NAME = "America/Argentina/Buenos_Aires"
+TZ = ZoneInfo(TZ_NAME)
 
-SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
-SESSIONS_JSON = SESSIONS_DIR / "sessions.json"
+AGENT_ID = "main"
+PAGE_SIZE = 20
 
-MEMORY_DIR = Path.home() / ".openclaw/workspace/memory"
+RC_OK = 0
+RC_ERROR = 1
+RC_SIN_ACTIVIDAD = 3
 
 
-def normalizar_user_id(valor: str) -> str:
-    valor = valor.strip()
+def localizar_openclaw():
+    candidatos = [
+        shutil.which("openclaw"),
+        str(Path.home() / ".npm-global/bin/openclaw"),
+        str(Path.home() / ".local/bin/openclaw"),
+        "/home/linuxbrew/.linuxbrew/bin/openclaw",
+        "/usr/local/bin/openclaw",
+        "/usr/bin/openclaw",
+    ]
+
+    for candidato in candidatos:
+        if (
+            candidato
+            and Path(candidato).is_file()
+            and os.access(candidato, os.X_OK)
+        ):
+            return candidato
+
+    raise RuntimeError(
+        "No se encontró el ejecutable 'openclaw'."
+    )
+
+
+def ejecutar_json(cmd, timeout=70):
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+    if proc.returncode != 0:
+        detalle = (
+            proc.stderr
+            or proc.stdout
+            or ""
+        ).strip()
+
+        raise RuntimeError(
+            f"Comando falló con código "
+            f"{proc.returncode}: "
+            f"{detalle or 'sin detalle'}"
+        )
+
+    salida = proc.stdout.strip()
+
+    if not salida:
+        raise RuntimeError(
+            "El comando no devolvió salida JSON."
+        )
+
+    try:
+        return json.loads(salida)
+
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"No se pudo interpretar la salida JSON: {exc}"
+        ) from exc
+
+
+def normalizar_user_id(valor):
+    if not valor:
+        return None
+
+    valor = str(valor).strip()
 
     if valor.startswith("googlechat:"):
         valor = valor[len("googlechat:"):]
@@ -24,442 +96,866 @@ def normalizar_user_id(valor: str) -> str:
     if valor.isdigit():
         valor = f"users/{valor}"
 
-    if not valor.startswith("users/"):
+    if valor.startswith("users/"):
+        return valor
+
+    return None
+
+
+def validar_fecha(valor):
+    try:
+        return datetime.strptime(
+            valor,
+            "%Y-%m-%d",
+        ).date()
+
+    except ValueError:
         raise ValueError(
-            "El ID debe tener formato users/123456789... "
-            "o ser solamente el número."
+            "La fecha debe tener formato YYYY-MM-DD."
         )
 
-    return valor
+
+def listar_sesiones(openclaw):
+    return ejecutar_json(
+        [
+            openclaw,
+            "sessions",
+            "--agent",
+            AGENT_ID,
+            "--limit",
+            "all",
+            "--json",
+        ],
+        timeout=60,
+    )
 
 
-def user_id_para_archivo(user_id: str) -> str:
-    return user_id.replace("/", "_")
+def user_ids_participantes(session):
+    encontrados = set()
 
-
-def cargar_sessions():
-    if not SESSIONS_JSON.exists():
-        raise FileNotFoundError(f"No existe: {SESSIONS_JSON}")
-
-    with SESSIONS_JSON.open(
-        encoding="utf-8",
-        errors="ignore"
-    ) as f:
-        return json.load(f)
-
-
-def buscar_sesiones_usuario(sessions, user_id):
-    buscado = f"googlechat:{user_id}"
-    encontrados = []
-
-    for session_key, data in sessions.items():
-        if not isinstance(data, dict):
+    for participante in (
+        session.get("participants")
+        or []
+    ):
+        if not isinstance(participante, dict):
             continue
 
-        origin = data.get("origin") or {}
-
-        if origin.get("from") == buscado:
-            encontrados.append((session_key, data))
-
-    if not encontrados:
-        raise RuntimeError(
-            f"No se encontró ninguna sesión de Google Chat para {user_id}"
+        identity = (
+            participante.get("identity")
+            or {}
         )
+
+        if (
+            identity.get("pluginId")
+            != "googlechat"
+        ):
+            continue
+
+        user_id = normalizar_user_id(
+            identity.get("id")
+        )
+
+        if user_id:
+            encontrados.add(user_id)
 
     return encontrados
 
 
-def extraer_fecha_local(ts, tz):
-    if not ts or not isinstance(ts, str):
+def llamar_chat_history(
+    openclaw,
+    session_key,
+    limit=PAGE_SIZE,
+    offset=0,
+):
+    params = {
+        "sessionKey": session_key,
+        "limit": limit,
+    }
+
+    if offset:
+        params["offset"] = offset
+
+    params_json = json.dumps(
+        params,
+        separators=(",", ":"),
+    )
+
+    return ejecutar_json(
+        [
+            openclaw,
+            "gateway",
+            "call",
+            "chat.history",
+            "--params",
+            params_json,
+            "--timeout",
+            "60000",
+            "--json",
+        ],
+        timeout=70,
+    )
+
+
+def obtener_info_sesion(
+    openclaw,
+    session_key,
+):
+    data = llamar_chat_history(
+        openclaw,
+        session_key,
+        limit=1,
+        offset=0,
+    )
+
+    return (
+        data.get("sessionInfo")
+        or {}
+    )
+
+
+def buscar_sesiones_usuario(
+    openclaw,
+    user_id,
+):
+    payload = listar_sesiones(
+        openclaw
+    )
+
+    sesiones = []
+
+    nombre = None
+
+    for session in (
+        payload.get("sessions")
+        or []
+    ):
+        if not isinstance(session, dict):
+            continue
+
+        session_key = session.get("key")
+
+        if not session_key:
+            continue
+
+        if (
+            ":googlechat:direct:"
+            not in session_key
+        ):
+            continue
+
+        participantes = (
+            user_ids_participantes(
+                session
+            )
+        )
+
+        # Si sessions.list identifica
+        # claramente a otro usuario,
+        # no hace falta consultar
+        # chat.history.
+        if (
+            participantes
+            and user_id
+            not in participantes
+        ):
+            continue
+
+        try:
+            info = obtener_info_sesion(
+                openclaw,
+                session_key,
+            )
+
+        except Exception:
+            # Si participants ya confirma
+            # al usuario, conservamos
+            # igualmente la sesión.
+            if user_id in participantes:
+                sesiones.append(
+                    {
+                        "key": session_key,
+                        "sessionId": (
+                            session.get(
+                                "sessionId"
+                            )
+                        ),
+                    }
+                )
+
+            continue
+
+        origin = (
+            info.get("origin")
+            or {}
+        )
+
+        origen_user_id = (
+            normalizar_user_id(
+                origin.get("from")
+            )
+        )
+
+        if origen_user_id != user_id:
+            continue
+
+        session_id = (
+            info.get("sessionId")
+            or session.get("sessionId")
+        )
+
+        sesiones.append(
+            {
+                "key": session_key,
+                "sessionId": session_id,
+            }
+        )
+
+        nombre_detectado = (
+            info.get("displayName")
+            or origin.get("label")
+        )
+
+        if nombre_detectado:
+            nombre = nombre_detectado
+
+    # Evitar claves duplicadas.
+    sesiones_unicas = []
+    vistas = set()
+
+    for sesion in sesiones:
+        key = sesion["key"]
+
+        if key in vistas:
+            continue
+
+        vistas.add(key)
+        sesiones_unicas.append(
+            sesion
+        )
+
+    return (
+        nombre or user_id,
+        sesiones_unicas,
+    )
+
+
+def timestamp_local(timestamp_ms):
+    if timestamp_ms is None:
         return None
 
     try:
-        return datetime.fromisoformat(
-            ts.replace("Z", "+00:00")
-        ).astimezone(tz)
-    except Exception:
+        timestamp_ms = int(
+            timestamp_ms
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
         return None
+
+    return datetime.fromtimestamp(
+        timestamp_ms / 1000,
+        tz=TZ,
+    )
 
 
 def extraer_texto(content):
+    if isinstance(content, str):
+        texto = content.strip()
+
+        return texto or None
+
+    if not isinstance(content, list):
+        return None
+
     textos = []
 
-    if isinstance(content, str):
-        if content.strip():
-            textos.append(content.strip())
-
-    elif isinstance(content, list):
-        for item in content:
-            if not isinstance(item, dict):
-                continue
-
-            if item.get("type") == "text":
-                texto = item.get("text", "")
-
-                if texto and texto.strip():
-                    textos.append(texto.strip())
-
-    return "\n".join(textos).strip()
-
-
-def archivos_de_sesion(session_id):
-    archivos = []
-
-    for f in SESSIONS_DIR.glob(session_id + "*"):
-        nombre = f.name
-
-        if not f.is_file():
+    for item in content:
+        if not isinstance(item, dict):
             continue
 
-        # No incorporar trayectoria interna del agente.
-        if nombre.endswith(".trajectory.jsonl"):
+        if item.get("type") != "text":
             continue
 
-        if nombre == "sessions.json":
+        texto = item.get("text")
+
+        if not isinstance(texto, str):
             continue
 
-        # Incluye .jsonl y .jsonl.reset.*
-        if ".jsonl" in nombre:
-            archivos.append(f)
+        texto = texto.strip()
 
-    return sorted(archivos)
+        if texto:
+            textos.append(texto)
+
+    if not textos:
+        return None
+
+    return "\n".join(textos)
 
 
-def recolectar_mensajes(session_ids, fecha_buscada, tz):
+def obtener_mensajes_fecha(
+    openclaw,
+    session_key,
+    fecha_objetivo,
+):
+    offset = 0
     mensajes = []
-    vistos = set()
 
-    for session_id in session_ids:
-        for archivo in archivos_de_sesion(session_id):
+    while True:
+        data = llamar_chat_history(
+            openclaw,
+            session_key,
+            limit=PAGE_SIZE,
+            offset=offset,
+        )
 
-            try:
-                fh = archivo.open(
-                    encoding="utf-8",
-                    errors="ignore"
-                )
-            except Exception:
+        pagina = (
+            data.get("messages")
+            or []
+        )
+
+        if not pagina:
+            break
+
+        fechas_pagina = []
+
+        for mensaje in pagina:
+            if not isinstance(
+                mensaje,
+                dict,
+            ):
                 continue
 
-            with fh:
-                for linea in fh:
-
-                    try:
-                        obj = json.loads(linea)
-                    except Exception:
-                        continue
-
-                    if obj.get("type") != "message":
-                        continue
-
-                    msg = obj.get("message")
-
-                    if not isinstance(msg, dict):
-                        continue
-
-                    rol = msg.get("role")
-
-                    if rol not in ("user", "assistant"):
-                        continue
-
-                    dt = extraer_fecha_local(
-                        obj.get("timestamp"),
-                        tz
+            fecha_hora = (
+                timestamp_local(
+                    mensaje.get(
+                        "timestamp"
                     )
+                )
+            )
 
-                    if dt is None:
-                        continue
+            if fecha_hora is None:
+                continue
 
-                    if dt.strftime("%Y-%m-%d") != fecha_buscada:
-                        continue
+            fechas_pagina.append(
+                fecha_hora.date()
+            )
 
-                    texto = extraer_texto(
-                        msg.get("content", "")
-                    )
+            if (
+                fecha_hora.date()
+                != fecha_objetivo
+            ):
+                continue
 
-                    if not texto:
-                        continue
+            role = mensaje.get(
+                "role"
+            )
 
-                    if rol == "user":
-                        nombre = msg.get("senderName") or "Usuario"
-                    else:
-                        nombre = "Agente"
+            if role not in (
+                "user",
+                "assistant",
+            ):
+                continue
 
-                    dedupe_key = (
-                        obj.get("id"),
-                        obj.get("timestamp"),
-                        rol,
-                        texto
-                    )
+            texto = extraer_texto(
+                mensaje.get(
+                    "content"
+                )
+            )
 
-                    if dedupe_key in vistos:
-                        continue
+            if not texto:
+                continue
 
-                    vistos.add(dedupe_key)
+            openclaw_meta = (
+                mensaje.get(
+                    "__openclaw"
+                )
+                or {}
+            )
 
-                    mensajes.append({
-                        "dt": dt,
-                        "timestamp": dt.strftime(
-                            "%d/%m/%Y %H:%M:%S"
-                        ),
-                        "rol": rol,
-                        "nombre": nombre,
-                        "texto": texto,
-                        "archivo": archivo.name
-                    })
+            mensaje_id = (
+                openclaw_meta.get("id")
+                or mensaje.get(
+                    "idempotencyKey"
+                )
+                or ""
+            )
 
-    mensajes.sort(key=lambda x: x["dt"])
+            mensajes.append(
+                {
+                    "id": mensaje_id,
+                    "timestamp": (
+                        fecha_hora
+                    ),
+                    "role": role,
+                    "text": texto,
+                }
+            )
+
+        # chat.history devuelve primero
+        # el tramo más reciente y offset
+        # creciente retrocede en el
+        # historial.
+        #
+        # Si ya alcanzamos mensajes
+        # anteriores a la fecha pedida,
+        # no hace falta seguir paginando.
+        if (
+            fechas_pagina
+            and min(fechas_pagina)
+            < fecha_objetivo
+        ):
+            break
+
+        if not data.get("hasMore"):
+            break
+
+        next_offset = data.get(
+            "nextOffset"
+        )
+
+        if next_offset is None:
+            break
+
+        try:
+            next_offset = int(
+                next_offset
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            break
+
+        if next_offset <= offset:
+            break
+
+        offset = next_offset
 
     return mensajes
 
 
-def generar_markdown(
+def deduplicar_mensajes(
     mensajes,
-    user_id,
-    fecha,
-    nombre_usuario,
-    sesiones_revisadas
 ):
-    fecha_display = datetime.strptime(
-        fecha,
-        "%Y-%m-%d"
-    ).strftime("%d/%m/%Y")
+    resultado = []
+    vistos = set()
 
-    inicio = mensajes[0]["dt"].strftime("%H:%M:%S")
-    fin = mensajes[-1]["dt"].strftime("%H:%M:%S")
-
-    archivos_revisados = sorted({
-        m["archivo"]
-        for m in mensajes
-    })
-
-    lineas = [
-        f"# Memoria de conversación — {nombre_usuario}",
-        "",
-        "## Datos",
-        "",
-        f"- **Fecha:** {fecha_display}",
-        f"- **Usuario:** {nombre_usuario}",
-        f"- **ID Google Chat:** `{user_id}`",
-        "- **Canal:** Google Chat",
-        f"- **Zona horaria:** {TZ_NAME}",
-        f"- **Cantidad de intervenciones:** {len(mensajes)}",
-        f"- **Inicio:** {inicio}",
-        f"- **Fin:** {fin}",
-        "",
-        "## Sesiones revisadas",
-        "",
-    ]
-
-    for session_key in sesiones_revisadas:
-        lineas.append(f"- `{session_key}`")
-
-    lineas.extend([
-        "",
-        "## Archivos revisados",
-        "",
-    ])
-
-    for archivo in archivos_revisados:
-        lineas.append(f"- `{archivo}`")
-
-    lineas.extend([
-        "",
-        "---",
-        "",
-        "## Transcripción completa",
-        "",
-    ])
-
-    for m in mensajes:
-
-        titulo = (
-            m["nombre"]
-            if m["rol"] == "user"
-            else "Agente"
+    for mensaje in mensajes:
+        clave = (
+            mensaje.get("id")
+            or "",
+            mensaje["timestamp"].timestamp(),
+            mensaje["role"],
+            mensaje["text"],
         )
 
-        lineas.extend([
-            f"### [{m['timestamp']}] {titulo}",
-            "",
-            m["texto"],
-            "",
-            "---",
-            "",
-        ])
+        if clave in vistos:
+            continue
 
-    lineas.extend([
-        "## Origen",
-        "",
-        "Memoria generada automáticamente a partir "
-        "del historial local de sesiones de OpenClaw.",
-        "",
-    ])
+        vistos.add(clave)
 
-    return "\n".join(lineas)
+        resultado.append(
+            mensaje
+        )
+
+    return resultado
+
+
+def generar_markdown(
+    nombre,
+    user_id,
+    fecha_objetivo,
+    sesiones,
+    mensajes,
+):
+    mensajes = sorted(
+        mensajes,
+        key=lambda m: (
+            m["timestamp"],
+            m.get("id") or "",
+        ),
+    )
+
+    mensajes = (
+        deduplicar_mensajes(
+            mensajes
+        )
+    )
+
+    fecha_visible = (
+        fecha_objetivo.strftime(
+            "%d/%m/%Y"
+        )
+    )
+
+    inicio = (
+        mensajes[0]["timestamp"]
+        .strftime("%H:%M:%S")
+    )
+
+    fin = (
+        mensajes[-1]["timestamp"]
+        .strftime("%H:%M:%S")
+    )
+
+    lineas = []
+
+    lineas.append(
+        "# Memoria de conversación "
+        f"— {nombre}"
+    )
+
+    lineas.append("")
+    lineas.append("## Datos")
+    lineas.append("")
+
+    lineas.append(
+        f"- **Fecha:** "
+        f"{fecha_visible}"
+    )
+
+    lineas.append(
+        f"- **Usuario:** "
+        f"{nombre}"
+    )
+
+    lineas.append(
+        "- **ID Google Chat:** "
+        f"`{user_id}`"
+    )
+
+    lineas.append(
+        "- **Canal:** Google Chat"
+    )
+
+    lineas.append(
+        "- **Zona horaria:** "
+        f"{TZ_NAME}"
+    )
+
+    lineas.append(
+        "- **Cantidad de "
+        "intervenciones:** "
+        f"{len(mensajes)}"
+    )
+
+    lineas.append(
+        f"- **Inicio:** {inicio}"
+    )
+
+    lineas.append(
+        f"- **Fin:** {fin}"
+    )
+
+    lineas.append("")
+    lineas.append(
+        "## Sesiones revisadas"
+    )
+    lineas.append("")
+
+    for sesion in sesiones:
+        lineas.append(
+            f"- `{sesion['key']}`"
+        )
+
+    lineas.append("")
+    lineas.append(
+        "## Archivos revisados"
+    )
+    lineas.append("")
+
+    for sesion in sesiones:
+        session_id = (
+            sesion.get(
+                "sessionId"
+            )
+        )
+
+        if session_id:
+            lineas.append(
+                "- `chat.history` "
+                f"(`{session_id}`)"
+            )
+        else:
+            lineas.append(
+                "- `chat.history`"
+            )
+
+    lineas.append("")
+    lineas.append("---")
+    lineas.append("")
+    lineas.append(
+        "## Transcripción completa"
+    )
+    lineas.append("")
+
+    for mensaje in mensajes:
+        fecha_hora = (
+            mensaje["timestamp"]
+            .strftime(
+                "%d/%m/%Y %H:%M:%S"
+            )
+        )
+
+        if (
+            mensaje["role"]
+            == "user"
+        ):
+            autor = nombre
+        else:
+            autor = "Agente"
+
+        lineas.append(
+            f"### [{fecha_hora}] "
+            f"{autor}"
+        )
+
+        lineas.append("")
+        lineas.append(
+            mensaje["text"]
+        )
+        lineas.append("")
+        lineas.append("---")
+        lineas.append("")
+
+    lineas.append("## Origen")
+    lineas.append("")
+
+    lineas.append(
+        "Memoria generada "
+        "automáticamente a partir "
+        "del historial local de "
+        "sesiones de OpenClaw."
+    )
+
+    lineas.append("")
+
+    return "\n".join(
+        lineas
+    )
 
 
 def main():
-
     parser = argparse.ArgumentParser(
         description=(
-            "Genera un archivo de memoria Markdown con toda "
-            "la conversación diaria de un usuario de Google Chat."
+            "Genera una memoria "
+            "Markdown diaria a partir "
+            "de una conversación de "
+            "Google Chat en OpenClaw."
         )
     )
 
     parser.add_argument(
         "user_id",
         help=(
-            "ID de Google Chat. "
-            "Ej.: users/112625344596118312340"
-        )
+            "ID Google Chat. "
+            "Ejemplo: "
+            "users/123456789"
+        ),
     )
 
     parser.add_argument(
         "fecha",
-        help="Fecha a exportar en formato YYYY-MM-DD"
+        help=(
+            "Fecha a generar en "
+            "formato YYYY-MM-DD."
+        ),
     )
 
     parser.add_argument(
         "-o",
         "--output",
         help=(
-            "Ruta alternativa del archivo Markdown. "
-            "Si se omite, se guarda automáticamente "
-            "en ~/.openclaw/workspace/memory/"
-        )
+            "Ruta de salida opcional."
+        ),
     )
 
     args = parser.parse_args()
 
-    try:
-        user_id = normalizar_user_id(args.user_id)
-
-        datetime.strptime(
-            args.fecha,
-            "%Y-%m-%d"
+    user_id = (
+        normalizar_user_id(
+            args.user_id
         )
-
-    except Exception as e:
-        print(
-            f"ERROR: {e}",
-            file=sys.stderr
-        )
-        sys.exit(1)
-
-    try:
-        sessions = cargar_sessions()
-
-        sesiones_usuario = buscar_sesiones_usuario(
-            sessions,
-            user_id
-        )
-
-    except Exception as e:
-        print(
-            f"ERROR: {e}",
-            file=sys.stderr
-        )
-        sys.exit(2)
-
-    session_ids = []
-    session_keys = []
-    nombre_usuario = None
-
-    for session_key, data in sesiones_usuario:
-
-        session_keys.append(session_key)
-
-        origin = data.get("origin") or {}
-
-        if not nombre_usuario:
-            nombre_usuario = origin.get("label")
-
-        ids = list(
-            data.get("usageFamilySessionIds") or []
-        )
-
-        if data.get("sessionId"):
-            ids.append(data["sessionId"])
-
-        for sid in ids:
-            if sid and sid not in session_ids:
-                session_ids.append(sid)
-
-    if not nombre_usuario:
-        nombre_usuario = user_id
-
-    mensajes = recolectar_mensajes(
-        session_ids,
-        args.fecha,
-        ZoneInfo(TZ_NAME)
     )
+
+    if not user_id:
+        print(
+            "ERROR | ID Google Chat "
+            "inválido.",
+            file=sys.stderr,
+        )
+
+        return RC_ERROR
+
+    try:
+        fecha_objetivo = (
+            validar_fecha(
+                args.fecha
+            )
+        )
+
+    except ValueError as exc:
+        print(
+            f"ERROR | {exc}",
+            file=sys.stderr,
+        )
+
+        return RC_ERROR
+
+    try:
+        openclaw = (
+            localizar_openclaw()
+        )
+
+        nombre, sesiones = (
+            buscar_sesiones_usuario(
+                openclaw,
+                user_id,
+            )
+        )
+
+    except Exception as exc:
+        print(
+            "ERROR | No se pudieron "
+            "obtener las sesiones: "
+            f"{exc}",
+            file=sys.stderr,
+        )
+
+        return RC_ERROR
+
+    if not sesiones:
+        print(
+            "Sin sesiones Google Chat "
+            f"para {user_id}."
+        )
+
+        return RC_SIN_ACTIVIDAD
+
+    mensajes = []
+
+    sesiones_con_actividad = []
+
+    for sesion in sesiones:
+        try:
+            mensajes_sesion = (
+                obtener_mensajes_fecha(
+                    openclaw,
+                    sesion["key"],
+                    fecha_objetivo,
+                )
+            )
+
+        except Exception as exc:
+            print(
+                "ERROR | No se pudo "
+                "leer "
+                f"{sesion['key']}: "
+                f"{exc}",
+                file=sys.stderr,
+            )
+
+            return RC_ERROR
+
+        if mensajes_sesion:
+            sesiones_con_actividad.append(
+                sesion
+            )
+
+            mensajes.extend(
+                mensajes_sesion
+            )
 
     if not mensajes:
         print(
-            f"No se encontraron mensajes de "
-            f"{user_id} para la fecha {args.fecha}.",
-            file=sys.stderr
+            "Sin actividad para "
+            f"{user_id} en "
+            f"{args.fecha}."
         )
-        sys.exit(3)
 
-    for m in mensajes:
-        if (
-            m["rol"] == "user"
-            and m["nombre"] != "Usuario"
-        ):
-            nombre_usuario = m["nombre"]
-            break
+        return RC_SIN_ACTIVIDAD
 
-    documento = generar_markdown(
-        mensajes,
+    mensajes = sorted(
+        deduplicar_mensajes(
+            mensajes
+        ),
+        key=lambda m: (
+            m["timestamp"],
+            m.get("id") or "",
+        ),
+    )
+
+    contenido = generar_markdown(
+        nombre,
         user_id,
-        args.fecha,
-        nombre_usuario,
-        session_keys
+        fecha_objetivo,
+        sesiones_con_actividad,
+        mensajes,
     )
 
     if args.output:
-
         salida = Path(
             args.output
         ).expanduser()
 
     else:
-
-        MEMORY_DIR.mkdir(
-            parents=True,
-            exist_ok=True
-        )
-
-        id_archivo = user_id_para_archivo(
-            user_id
+        user_filename = (
+            user_id.replace(
+                "/",
+                "_",
+            )
         )
 
         salida = (
-            MEMORY_DIR
-            / f"MEMORY-{id_archivo}-{args.fecha}.md"
+            Path.home()
+            / ".openclaw"
+            / "workspace"
+            / "memory"
+            / (
+                "MEMORY-"
+                f"{user_filename}-"
+                f"{args.fecha}.md"
+            )
         )
 
     salida.parent.mkdir(
         parents=True,
-        exist_ok=True
+        exist_ok=True,
     )
 
     salida.write_text(
-        documento,
-        encoding="utf-8"
+        contenido,
+        encoding="utf-8",
     )
 
-    print(f"Usuario: {nombre_usuario}")
-    print(f"ID Google Chat: {user_id}")
-    print(f"Fecha: {args.fecha}")
-    print(f"Intervenciones: {len(mensajes)}")
-    print(f"Memoria generada: {salida}")
+    print(
+        f"Usuario: {nombre}"
+    )
+
+    print(
+        f"ID Google Chat: "
+        f"{user_id}"
+    )
+
+    print(
+        f"Fecha: "
+        f"{args.fecha}"
+    )
+
+    print(
+        "Intervenciones: "
+        f"{len(mensajes)}"
+    )
+
+    print(
+        "Memoria generada: "
+        f"{salida}"
+    )
 
     # Purgar secretos del archivo generado
-    import subprocess
-
     purgador = (
         Path(__file__).resolve().parent
         / "purga_secretos_memoria_md.py"
@@ -468,25 +964,27 @@ def main():
     if not purgador.is_file():
         print(
             f"ERROR | No se encontró el purgador: {purgador}",
-            file=sys.stderr
+            file=sys.stderr,
         )
-        raise SystemExit(1)
+        return RC_ERROR
 
     resultado_purga = subprocess.run(
         [
             sys.executable,
             str(purgador),
-            str(salida)
+            str(salida),
         ]
     )
 
     if resultado_purga.returncode != 0:
         print(
             f"ERROR | Falló la purga de secretos: {salida}",
-            file=sys.stderr
+            file=sys.stderr,
         )
-        raise SystemExit(1)
+        return RC_ERROR
+
+    return RC_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
