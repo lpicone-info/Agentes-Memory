@@ -1,0 +1,8 @@
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L22] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L23] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 78% left ⏱1h 18m · secondary 0% left ⏱1d （rate limit reached） MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L24] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L25] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 100% left ⏱6d 23h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L26] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L27] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 91% left ⏱2h 14m · secondary 99% left ⏱6d 21h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L28] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L29] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 91% left ⏱27m · secondary 99% left ⏱6d 19h MCP servers: 1 Skills: 6
