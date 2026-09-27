@@ -1,0 +1,3 @@
+[main/sessions/main/98046d91-7014-4819-94c9-8c55d3cf183b#L27] Assistant: Hola, Luis.
+[main/sessions/main/72f6983b-fdd6-489d-a8ab-b03d0c44105e#L1324] Assistant: Maru, completo la recuperación obligatoria posterior a la compactación y enseguida continuamos.
+[main/sessions/main/72f6983b-fdd6-489d-a8ab-b03d0c44105e#L1331] Assistant: Hola, Maru. ¿En qué avanzamos?
