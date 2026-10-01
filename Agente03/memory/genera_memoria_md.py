@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime
@@ -394,147 +395,232 @@ def extraer_texto(content):
     return "\n".join(textos)
 
 
+def resolver_db_agente():
+    state_dir = os.environ.get(
+        "OPENCLAW_STATE_DIR"
+    )
+
+    if state_dir:
+        base = Path(
+            state_dir
+        ).expanduser()
+    else:
+        base = (
+            Path.home()
+            / ".openclaw"
+        )
+
+    db_path = (
+        base
+        / "agents"
+        / AGENT_ID
+        / "agent"
+        / "openclaw-agent.sqlite"
+    )
+
+    if not db_path.is_file():
+        raise RuntimeError(
+            "No se encontró la base "
+            f"de sesiones: {db_path}"
+        )
+
+    return db_path
+
+
+def abrir_db_lectura():
+    db_path = resolver_db_agente()
+
+    uri = (
+        "file:"
+        + str(db_path.resolve())
+        + "?mode=ro"
+    )
+
+    conn = sqlite3.connect(
+        uri,
+        uri=True,
+        timeout=30,
+    )
+
+    conn.execute(
+        "PRAGMA query_only = ON"
+    )
+
+    return conn
+
+
+def obtener_linea_sesiones(
+    conn,
+    session_key,
+    current_session_id,
+):
+    if not current_session_id:
+        raise RuntimeError(
+            "La sesión activa no tiene "
+            "sessionId."
+        )
+
+    rows = conn.execute(
+        """
+        WITH RECURSIVE lineage(
+            session_id,
+            previous_session_id,
+            created_at
+        ) AS (
+            SELECT
+                session_id,
+                previous_session_id,
+                created_at
+            FROM session_windows
+            WHERE session_id = ?
+              AND session_key = ?
+
+            UNION ALL
+
+            SELECT
+                w.session_id,
+                w.previous_session_id,
+                w.created_at
+            FROM session_windows AS w
+            JOIN lineage AS l
+              ON w.session_id =
+                 l.previous_session_id
+            WHERE w.session_key = ?
+        )
+        SELECT
+            session_id,
+            created_at
+        FROM lineage
+        ORDER BY created_at ASC,
+                 session_id ASC
+        """,
+        (
+            current_session_id,
+            session_key,
+            session_key,
+        ),
+    ).fetchall()
+
+    if not rows:
+        raise RuntimeError(
+            "No se encontró la línea "
+            "histórica de la sesión "
+            f"{session_key}."
+        )
+
+    return [
+        row[0]
+        for row in rows
+    ]
+
+
 def obtener_mensajes_fecha(
     openclaw,
     session_key,
+    current_session_id,
     fecha_objetivo,
 ):
-    offset = 0
+    del openclaw
+
     mensajes = []
+    sesiones_con_actividad = []
 
-    while True:
-        data = llamar_chat_history(
-            openclaw,
-            session_key,
-            limit=PAGE_SIZE,
-            offset=offset,
+    conn = abrir_db_lectura()
+
+    try:
+        session_ids = (
+            obtener_linea_sesiones(
+                conn,
+                session_key,
+                current_session_id,
+            )
         )
 
-        pagina = (
-            data.get("messages")
-            or []
-        )
+        for session_id in session_ids:
+            rows = conn.execute(
+                """
+                SELECT
+                    rowid,
+                    message_id,
+                    role,
+                    text,
+                    timestamp
+                FROM session_transcript_fts
+                WHERE session_id = ?
+                  AND role IN (
+                      'user',
+                      'assistant'
+                  )
+                ORDER BY
+                    CAST(timestamp AS INTEGER) ASC,
+                    rowid ASC
+                """,
+                (session_id,),
+            ).fetchall()
 
-        if not pagina:
-            break
+            tiene_actividad = False
 
-        fechas_pagina = []
-
-        for mensaje in pagina:
-            if not isinstance(
-                mensaje,
-                dict,
-            ):
-                continue
-
-            fecha_hora = (
-                timestamp_local(
-                    mensaje.get(
-                        "timestamp"
+            for (
+                rowid,
+                message_id,
+                role,
+                text,
+                timestamp_ms,
+            ) in rows:
+                fecha_hora = (
+                    timestamp_local(
+                        timestamp_ms
                     )
                 )
-            )
 
-            if fecha_hora is None:
-                continue
+                if fecha_hora is None:
+                    continue
 
-            fechas_pagina.append(
-                fecha_hora.date()
-            )
+                if (
+                    fecha_hora.date()
+                    != fecha_objetivo
+                ):
+                    continue
 
-            if (
-                fecha_hora.date()
-                != fecha_objetivo
-            ):
-                continue
+                if not isinstance(
+                    text,
+                    str,
+                ):
+                    continue
 
-            role = mensaje.get(
-                "role"
-            )
+                text = text.strip()
 
-            if role not in (
-                "user",
-                "assistant",
-            ):
-                continue
+                if not text:
+                    continue
 
-            texto = extraer_texto(
-                mensaje.get(
-                    "content"
+                tiene_actividad = True
+
+                mensajes.append(
+                    {
+                        "id": (
+                            message_id
+                            or f"fts:{session_id}:{rowid}"
+                        ),
+                        "timestamp": (
+                            fecha_hora
+                        ),
+                        "role": role,
+                        "text": text,
+                    }
                 )
-            )
 
-            if not texto:
-                continue
-
-            openclaw_meta = (
-                mensaje.get(
-                    "__openclaw"
+            if tiene_actividad:
+                sesiones_con_actividad.append(
+                    session_id
                 )
-                or {}
-            )
 
-            mensaje_id = (
-                openclaw_meta.get("id")
-                or mensaje.get(
-                    "idempotencyKey"
-                )
-                or ""
-            )
+    finally:
+        conn.close()
 
-            mensajes.append(
-                {
-                    "id": mensaje_id,
-                    "timestamp": (
-                        fecha_hora
-                    ),
-                    "role": role,
-                    "text": texto,
-                }
-            )
-
-        # chat.history devuelve primero
-        # el tramo más reciente y offset
-        # creciente retrocede en el
-        # historial.
-        #
-        # Si ya alcanzamos mensajes
-        # anteriores a la fecha pedida,
-        # no hace falta seguir paginando.
-        if (
-            fechas_pagina
-            and min(fechas_pagina)
-            < fecha_objetivo
-        ):
-            break
-
-        if not data.get("hasMore"):
-            break
-
-        next_offset = data.get(
-            "nextOffset"
-        )
-
-        if next_offset is None:
-            break
-
-        try:
-            next_offset = int(
-                next_offset
-            )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-            break
-
-        if next_offset <= offset:
-            break
-
-        offset = next_offset
-
-    return mensajes
+    return (
+        mensajes,
+        sesiones_con_actividad,
+    )
 
 
 def deduplicar_mensajes(
@@ -656,9 +742,21 @@ def generar_markdown(
     )
     lineas.append("")
 
+    claves_sesion = []
+    claves_vistas = set()
+
     for sesion in sesiones:
+        key = sesion["key"]
+
+        if key in claves_vistas:
+            continue
+
+        claves_vistas.add(key)
+        claves_sesion.append(key)
+
+    for key in claves_sesion:
         lineas.append(
-            f"- `{sesion['key']}`"
+            f"- `{key}`"
         )
 
     lineas.append("")
@@ -674,14 +772,19 @@ def generar_markdown(
             )
         )
 
+        source = (
+            sesion.get("source")
+            or "chat.history"
+        )
+
         if session_id:
             lineas.append(
-                "- `chat.history` "
+                f"- `{source}` "
                 f"(`{session_id}`)"
             )
         else:
             lineas.append(
-                "- `chat.history`"
+                f"- `{source}`"
             )
 
     lineas.append("")
@@ -841,12 +944,14 @@ def main():
 
     for sesion in sesiones:
         try:
-            mensajes_sesion = (
-                obtener_mensajes_fecha(
-                    openclaw,
-                    sesion["key"],
-                    fecha_objetivo,
-                )
+            (
+                mensajes_sesion,
+                session_ids_actividad,
+            ) = obtener_mensajes_fecha(
+                openclaw,
+                sesion["key"],
+                sesion.get("sessionId"),
+                fecha_objetivo,
             )
 
         except Exception as exc:
@@ -861,9 +966,18 @@ def main():
             return RC_ERROR
 
         if mensajes_sesion:
-            sesiones_con_actividad.append(
-                sesion
-            )
+            for session_id in (
+                session_ids_actividad
+            ):
+                sesiones_con_actividad.append(
+                    {
+                        "key": sesion["key"],
+                        "sessionId": session_id,
+                        "source": (
+                            "openclaw-agent.sqlite"
+                        ),
+                    }
+                )
 
             mensajes.extend(
                 mensajes_sesion
