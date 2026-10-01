@@ -1,0 +1,8 @@
+[main/sessions/main/ba89a498-df89-4e15-a442-3aa3486d8e3f#L50] User: Estás disponible?
+[main/sessions/main/ba89a498-df89-4e15-a442-3aa3486d8e3f#L51] Assistant: Sí, Luis. Estoy disponible.
+[main/sessions/main/ba89a498-df89-4e15-a442-3aa3486d8e3f#L52] User: Estás?
+[main/sessions/main/ba89a498-df89-4e15-a442-3aa3486d8e3f#L53] Assistant: Sí, Luis. Estoy disponible.
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L92] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L93] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 82% left ⏱3h 48m · secondary 54% left ⏱3d 6h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L94] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L95] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 35% left ⏱2h 30m · secondary 46% left ⏱3d 5h MCP servers: 1 Skills: 6
