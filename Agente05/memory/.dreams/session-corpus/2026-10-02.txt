@@ -1,0 +1,2 @@
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1032] User: me podes decir la lista de pantallas que tiene PRESMED en el menú: Autorizaciones -> Consultas
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1033] Assistant: Alejandro, para obtener la lista exacta necesito que me indiques **qué repositorio y versión de PRESMED** debo revisar. Existen varias working copies registradas y no puedo asumir cuál corresponde al menú **Autorizaciones → Consultas**. No realizaré la búsqueda hasta t
