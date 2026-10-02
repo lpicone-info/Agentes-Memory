@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime
@@ -453,129 +454,113 @@ def extraer_texto(content):
     return "\n".join(textos)
 
 
+def ruta_base_agente():
+    return os.path.expanduser(
+        "~/.openclaw/agents/main/agent/openclaw-agent.sqlite"
+    )
+
+
+def obtener_cadena_session_ids(
+    conexion,
+    session_id,
+):
+    session_ids = []
+    vistos = set()
+    actual = session_id
+
+    while actual and actual not in vistos:
+        vistos.add(actual)
+        session_ids.append(actual)
+
+        fila = conexion.execute(
+            "SELECT previous_session_id "
+            "FROM session_windows "
+            "WHERE session_id = ?",
+            (actual,),
+        ).fetchone()
+
+        if not fila:
+            break
+
+        actual = fila[0]
+
+    return session_ids
+
+
 def obtener_mensajes_fecha(
-    openclaw,
-    session_key,
+    session_id,
     fecha_objetivo,
 ):
-    offset = 0
+    if not session_id:
+        return []
+
+    db_path = ruta_base_agente()
+
+    if not os.path.isfile(db_path):
+        raise RuntimeError(
+            f"No existe la base del agente: {db_path}"
+        )
+
     mensajes = []
 
-    while True:
-        data = llamar_chat_history(
-            openclaw,
-            session_key,
-            limit=PAGE_SIZE,
-            offset=offset,
+    uri = f"file:{db_path}?mode=ro"
+
+    with sqlite3.connect(
+        uri,
+        uri=True,
+        timeout=30,
+    ) as conexion:
+        conexion.execute("PRAGMA query_only = ON")
+
+        session_ids = obtener_cadena_session_ids(
+            conexion,
+            session_id,
         )
 
-        pagina = (
-            data.get("messages")
-            or []
-        )
+        for sid in session_ids:
+            filas = conexion.execute(
+                "SELECT message_id, role, text, timestamp "
+                "FROM session_transcript_fts "
+                "WHERE session_id = ?",
+                (sid,),
+            ).fetchall()
 
-        if not pagina:
-            break
+            for mensaje_id, role, texto, timestamp in filas:
+                if role not in (
+                    "user",
+                    "assistant",
+                ):
+                    continue
 
-        fechas_pagina = []
+                if not isinstance(texto, str):
+                    continue
 
-        for mensaje in pagina:
-            if not isinstance(
-                mensaje,
-                dict,
-            ):
-                continue
+                texto = texto.strip()
 
-            fecha_hora = (
-                timestamp_local(
-                    mensaje.get(
-                        "timestamp"
-                    )
+                if not texto:
+                    continue
+
+                fecha_hora = timestamp_local(
+                    timestamp
                 )
-            )
 
-            if fecha_hora is None:
-                continue
+                if fecha_hora is None:
+                    continue
 
-            fechas_pagina.append(
-                fecha_hora.date()
-            )
+                if (
+                    fecha_hora.date()
+                    != fecha_objetivo
+                ):
+                    continue
 
-            if (
-                fecha_hora.date()
-                != fecha_objetivo
-            ):
-                continue
-
-            role = mensaje.get("role")
-
-            if role not in (
-                "user",
-                "assistant",
-            ):
-                continue
-
-            texto = extraer_texto(
-                mensaje.get("content")
-            )
-
-            if not texto:
-                continue
-
-            openclaw_meta = (
-                mensaje.get("__openclaw")
-                or {}
-            )
-
-            mensaje_id = (
-                openclaw_meta.get("id")
-                or mensaje.get(
-                    "idempotencyKey"
+                mensajes.append(
+                    {
+                        "id": mensaje_id or "",
+                        "timestamp": fecha_hora,
+                        "role": role,
+                        "text": texto,
+                    }
                 )
-                or ""
-            )
-
-            mensajes.append(
-                {
-                    "id": mensaje_id,
-                    "timestamp": fecha_hora,
-                    "role": role,
-                    "text": texto,
-                }
-            )
-
-        if (
-            fechas_pagina
-            and min(fechas_pagina)
-            < fecha_objetivo
-        ):
-            break
-
-        if not data.get("hasMore"):
-            break
-
-        next_offset = data.get(
-            "nextOffset"
-        )
-
-        if next_offset is None:
-            break
-
-        try:
-            next_offset = int(
-                next_offset
-            )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-            break
-
-        if next_offset <= offset:
-            break
-
-        offset = next_offset
 
     return mensajes
 
@@ -827,8 +812,7 @@ def main():
         try:
             mensajes.extend(
                 obtener_mensajes_fecha(
-                    openclaw,
-                    sesion["key"],
+                    sesion.get("sessionId"),
                     fecha_objetivo,
                 )
             )
