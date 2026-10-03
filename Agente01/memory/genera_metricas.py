@@ -18,6 +18,12 @@ TZ = ZoneInfo(TZ_NAME)
 AGENT_ID = "main"
 PAGE_SIZE = 20
 
+MYSQL_CONFIG = os.path.expanduser(
+    "~/.openclaw/credentials/metricas-mysql.cnf"
+)
+MYSQL_DATABASE = "metricas"
+MYSQL_TABLE = "interacciones_usuarios"
+
 RC_OK = 0
 RC_ERROR = 1
 RC_SIN_ACTIVIDAD = 3
@@ -667,6 +673,118 @@ def formatear_duracion(segundos):
     return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
 
 
+def localizar_mysql():
+    candidatos = [
+        shutil.which("mysql"),
+        "/usr/bin/mysql",
+        "/usr/local/bin/mysql",
+    ]
+
+    for candidato in candidatos:
+        if (
+            candidato
+            and os.path.isfile(candidato)
+            and os.access(candidato, os.X_OK)
+        ):
+            return candidato
+
+    raise RuntimeError(
+        "No se encontro el cliente oficial 'mysql'."
+    )
+
+
+def sql_literal(valor):
+    if valor is None:
+        return "NULL"
+
+    if isinstance(valor, (int, float)):
+        return str(valor)
+
+    texto = str(valor)
+    texto = texto.replace("\\", "\\\\")
+    texto = texto.replace("\0", "\\0")
+    texto = texto.replace("\n", "\\n")
+    texto = texto.replace("\r", "\\r")
+    texto = texto.replace("\x1a", "\\Z")
+    texto = texto.replace("'", "\\'")
+
+    return f"'{texto}'"
+
+
+def guardar_metricas_mysql(fila):
+    if not os.path.isfile(MYSQL_CONFIG):
+        raise RuntimeError(
+            "No existe la configuracion MySQL: "
+            f"{MYSQL_CONFIG}"
+        )
+
+    mysql = localizar_mysql()
+
+    sql = f"""
+INSERT INTO {MYSQL_TABLE} (
+    id_agente,
+    agente,
+    usuario,
+    id_usuario,
+    fecha,
+    hora_inicio,
+    hora_fin,
+    cantidad_interacciones,
+    tiempo_agente_segundos,
+    tareas
+)
+VALUES (
+    {sql_literal(fila['agente_id'])},
+    {sql_literal(fila['agente'])},
+    {sql_literal(fila['usuario'])},
+    {sql_literal(fila['usuario_id'])},
+    {sql_literal(fila['fecha'])},
+    {sql_literal(fila['inicio'])},
+    {sql_literal(fila['fin'])},
+    {sql_literal(fila['interacciones'])},
+    {sql_literal(fila['tiempo_agente_segundos'])},
+    {sql_literal(fila['tareas'])}
+) AS nueva
+ON DUPLICATE KEY UPDATE
+    agente = nueva.agente,
+    usuario = nueva.usuario,
+    hora_inicio = nueva.hora_inicio,
+    hora_fin = nueva.hora_fin,
+    cantidad_interacciones = nueva.cantidad_interacciones,
+    tiempo_agente_segundos = nueva.tiempo_agente_segundos,
+    tareas = nueva.tareas;
+"""
+
+    proc = subprocess.run(
+        [
+            mysql,
+            f"--defaults-extra-file={MYSQL_CONFIG}",
+            f"--database={MYSQL_DATABASE}",
+            "--default-character-set=utf8mb4",
+            "--batch",
+            "--skip-column-names",
+        ],
+        input=sql,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    if proc.returncode != 0:
+        detalle = (
+            proc.stderr
+            or proc.stdout
+            or ""
+        ).strip()
+
+        raise RuntimeError(
+            "No se pudieron guardar las metricas en MySQL: "
+            f"{detalle or 'sin detalle'}"
+        )
+
+
 def recortar(valor, ancho_maximo):
     texto = str(valor)
 
@@ -859,7 +977,7 @@ def main():
         .strftime("%H:%M:%S")
     )
 
-    fin = "-"
+    fin = None
 
     if mensajes_agente:
         fin = (
@@ -886,13 +1004,19 @@ def main():
         "inicio": inicio,
         "fin": fin,
         "interacciones": len(mensajes_usuario),
-        "tiempo_agente": formatear_duracion(
-            tiempo_segundos
-        ),
-        "tareas": ", ".join(tareas) or "-",
+        "tiempo_agente_segundos": tiempo_segundos,
+        "tareas": ", ".join(tareas) or None,
     }
 
-    imprimir_grilla(fila)
+    try:
+        guardar_metricas_mysql(fila)
+
+    except Exception as exc:
+        print(
+            f"ERROR | {exc}",
+            file=sys.stderr,
+        )
+        return RC_ERROR
 
     return RC_OK
 
