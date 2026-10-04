@@ -1,0 +1,4 @@
+[main/sessions/main/d49dd542-9e35-4160-8820-f19f78b6d042#L170] User: /codez status
+[main/sessions/main/d49dd542-9e35-4160-8820-f19f78b6d042#L171] Assistant: Comando incorrecto: usá `/codex status`.
+[main/sessions/main/d49dd542-9e35-4160-8820-f19f78b6d042#L172] User: /codex status
+[main/sessions/main/d49dd542-9e35-4160-8820-f19f78b6d042#L173] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente00＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 80% left ⏱6d 5h MCP servers: 1 Skills: 6
