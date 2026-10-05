@@ -1,0 +1,5 @@
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L99] User: /codex status
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L100] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente99＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 92% left ⏱5d 2h MCP servers: 1 Skills: 6
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L101] User: /codex status
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L102] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente99＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 92% left ⏱5d 1h MCP servers: 1 Skills: 6
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L120] Assistant: Hola. Estoy disponible para trabajar. ¿En qué avanzamos?
