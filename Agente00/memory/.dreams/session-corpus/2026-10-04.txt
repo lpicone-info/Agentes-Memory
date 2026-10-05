@@ -1,0 +1,6 @@
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L984] User: /codex status
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L985] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente00＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱5h · secondary 80% left ⏱5d 1h MCP servers: 1 Skills: 6
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L986] User: /codex status
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L987] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 Account: agente00＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱5h · secondary 80% left ⏱5d 1h MCP servers: 1 Skills: 6
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L989] Assistant: Voy a completar el bootstrap operativo obligatorio y cargar las preferencias asociadas a `gateway-owner` antes de responder.
+[main/sessions/main/30551d77-2b42-4d19-abf9-b2ab3dc4374b#L1002] Assistant: Hola. Estoy disponible para trabajar. ¿En qué avanzamos?
