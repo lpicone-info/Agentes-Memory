@@ -25,6 +25,12 @@ USUARIOS_MD = os.path.expanduser("~/.openclaw/workspace/USUARIOS.md")
 AGENTS_MD = os.path.expanduser("~/.openclaw/workspace/AGENTS.md")
 REDMINE_INDEX = os.path.expanduser("~/.openclaw/secrets/redmine/index.tsv")
 
+MYSQL_DEFAULTS_FILE = os.path.expanduser(
+    "~/.openclaw/credentials/metricas-mysql.cnf"
+)
+MYSQL_DATABASE = "metricas"
+MYSQL_TABLE = "tiempos_redmines"
+
 PAGE_SIZE = 100
 HTTP_TIMEOUT = 30
 
@@ -240,33 +246,22 @@ def detectar_agente(agentes):
     )
 
 
-def usuarios_propios_del_agente(agentes, id_agente_actual):
-    primer_agente_por_usuario = {}
-
-    for agente in agentes:
-        for usuario in agente["usuarios"]:
-            clave = normalizar_texto(usuario["usuario_redmine"])
-            if clave not in primer_agente_por_usuario:
-                primer_agente_por_usuario[clave] = agente["id"]
-
+def usuarios_del_agente(agentes, id_agente_actual):
     agente_actual = next(
-        (agente for agente in agentes if agente["id"] == id_agente_actual),
+        (
+            agente
+            for agente in agentes
+            if agente["id"] == id_agente_actual
+        ),
         None,
     )
+
     if agente_actual is None:
-        raise RuntimeError(f"No existe el agente {id_agente_actual} en USUARIOS.md.")
+        raise RuntimeError(
+            f"No existe el agente {id_agente_actual} en USUARIOS.md."
+        )
 
-    propios = []
-    omitidos = []
-
-    for usuario in agente_actual["usuarios"]:
-        clave = normalizar_texto(usuario["usuario_redmine"])
-        if primer_agente_por_usuario.get(clave) == id_agente_actual:
-            propios.append(usuario)
-        else:
-            omitidos.append(usuario)
-
-    return propios, omitidos
+    return list(agente_actual["usuarios"])
 
 
 def resolver_credencial_redmine(usuario):
@@ -524,6 +519,7 @@ def construir_filas(entradas, usuarios, agente, api_key, fecha_objetivo):
                 "nombre_redmine": issue.get("subject") or "-",
                 "proyecto": proyecto.get("name") or "-",
                 "tiempo": formatear_horas(entrada.get("hours")),
+                "tiempo_horas": float(entrada.get("hours") or 0),
                 "comentario": entrada.get("comments") or "-",
                 "demorado": demorado,
             }
@@ -602,9 +598,258 @@ def imprimir_grilla(filas):
     print(separador)
 
 
+
+def localizar_mysql():
+    candidatos = [
+        shutil.which("mysql"),
+        "/usr/bin/mysql",
+        "/usr/local/bin/mysql",
+    ]
+
+    for candidato in candidatos:
+        if (
+            candidato
+            and os.path.isfile(candidato)
+            and os.access(candidato, os.X_OK)
+        ):
+            return candidato
+
+    raise RuntimeError(
+        "No se encontro el cliente 'mysql'."
+    )
+
+
+def sql_texto(valor):
+    if valor is None:
+        return "NULL"
+
+    texto = str(valor)
+    hexadecimal = texto.encode("utf-8").hex()
+
+    return (
+        "CONVERT(X'"
+        + hexadecimal
+        + "' USING utf8mb4)"
+    )
+
+
+def ejecutar_mysql(sql, devolver_salida=False):
+    if not os.path.isfile(MYSQL_DEFAULTS_FILE):
+        raise RuntimeError(
+            "No existe el archivo de credenciales MySQL: "
+            f"{MYSQL_DEFAULTS_FILE}"
+        )
+
+    mysql = localizar_mysql()
+
+    cmd = [
+        mysql,
+        f"--defaults-extra-file={MYSQL_DEFAULTS_FILE}",
+        "--batch",
+        "--skip-column-names",
+        MYSQL_DATABASE,
+    ]
+
+    proc = subprocess.run(
+        cmd,
+        input=sql,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    if proc.returncode != 0:
+        detalle = (
+            proc.stderr
+            or proc.stdout
+            or "sin detalle"
+        ).strip()
+
+        raise RuntimeError(
+            "Fallo la escritura en MySQL: "
+            f"{detalle}"
+        )
+
+    if devolver_salida:
+        return proc.stdout
+
+    return ""
+
+
+def obtener_registros_existentes_mysql(filas):
+    if not filas:
+        return {}
+
+    ids = sorted(
+        {
+            int(fila["_time_entry_id"])
+            for fila in filas
+        }
+    )
+
+    consulta = (
+        "SELECT time_entry_id, id_agente "
+        f"FROM {MYSQL_TABLE} "
+        "WHERE time_entry_id IN ("
+        + ",".join(str(valor) for valor in ids)
+        + ");"
+    )
+
+    salida = ejecutar_mysql(
+        consulta,
+        devolver_salida=True,
+    )
+
+    existentes = {}
+
+    for linea in salida.splitlines():
+        partes = linea.split("\t")
+
+        if len(partes) != 2:
+            continue
+
+        try:
+            time_entry_id = int(partes[0])
+        except ValueError:
+            continue
+
+        existentes[time_entry_id] = partes[1]
+
+    return existentes
+
+
+def guardar_filas_mysql(filas, id_agente_actual):
+    existentes = obtener_registros_existentes_mysql(
+        filas
+    )
+
+    sentencias = ["START TRANSACTION;"]
+
+    insertados = 0
+    actualizados = 0
+    omitidos_otro_agente = 0
+
+    for fila in filas:
+        time_entry_id = int(
+            fila["_time_entry_id"]
+        )
+
+        propietario = existentes.get(
+            time_entry_id
+        )
+
+        if (
+            propietario is not None
+            and propietario != id_agente_actual
+        ):
+            omitidos_otro_agente += 1
+            continue
+
+        redmine = fila.get("redmine")
+
+        if redmine in (None, "", "-"):
+            redmine_sql = "NULL"
+        else:
+            redmine_sql = str(int(redmine))
+
+        tiempo_horas = float(
+            fila.get("tiempo_horas") or 0
+        )
+
+        valores = {
+            "id_agente": sql_texto(fila["id_agente"]),
+            "agente": sql_texto(fila["agente"]),
+            "usuario": sql_texto(fila["usuario"]),
+            "usuario_redmine": sql_texto(fila["usuario_redmine"]),
+            "id_googlechat": sql_texto(fila["id_googlechat"]),
+            "fecha_carga": sql_texto(fila["fecha_carga"]),
+            "fecha_imputacion": sql_texto(fila["fecha_imputacion"]),
+            "redmine": redmine_sql,
+            "nombre_redmine": sql_texto(fila.get("nombre_redmine")),
+            "proyecto": sql_texto(fila.get("proyecto")),
+            "tiempo_horas": f"{tiempo_horas:.2f}",
+            "comentario": sql_texto(fila.get("comentario")),
+            "demorado": sql_texto(fila["demorado"]),
+        }
+
+        if propietario is None:
+            sentencias.append(
+                f"""
+INSERT INTO {MYSQL_TABLE} (
+    time_entry_id,
+    id_agente,
+    agente,
+    usuario,
+    usuario_redmine,
+    id_googlechat,
+    fecha_carga,
+    fecha_imputacion,
+    redmine,
+    nombre_redmine,
+    proyecto,
+    tiempo_horas,
+    comentario,
+    demorado
+) VALUES (
+    {time_entry_id},
+    {valores['id_agente']},
+    {valores['agente']},
+    {valores['usuario']},
+    {valores['usuario_redmine']},
+    {valores['id_googlechat']},
+    {valores['fecha_carga']},
+    {valores['fecha_imputacion']},
+    {valores['redmine']},
+    {valores['nombre_redmine']},
+    {valores['proyecto']},
+    {valores['tiempo_horas']},
+    {valores['comentario']},
+    {valores['demorado']}
+);
+"""
+            )
+            insertados += 1
+            continue
+
+        sentencias.append(
+            f"""
+UPDATE {MYSQL_TABLE}
+SET
+    agente = {valores['agente']},
+    usuario = {valores['usuario']},
+    usuario_redmine = {valores['usuario_redmine']},
+    id_googlechat = {valores['id_googlechat']},
+    fecha_carga = {valores['fecha_carga']},
+    fecha_imputacion = {valores['fecha_imputacion']},
+    redmine = {valores['redmine']},
+    nombre_redmine = {valores['nombre_redmine']},
+    proyecto = {valores['proyecto']},
+    tiempo_horas = {valores['tiempo_horas']},
+    comentario = {valores['comentario']},
+    demorado = {valores['demorado']}
+WHERE
+    time_entry_id = {time_entry_id}
+    AND id_agente = {valores['id_agente']};
+"""
+        )
+        actualizados += 1
+
+    sentencias.append("COMMIT;")
+
+    if insertados or actualizados:
+        ejecutar_mysql("\n".join(sentencias))
+
+    return {
+        "insertados": insertados,
+        "actualizados": actualizados,
+        "omitidos_otro_agente": omitidos_otro_agente,
+    }
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Genera una grilla con los tiempos Redmine cargados en una fecha."
+        description="Guarda en MySQL los tiempos Redmine cargados en una fecha."
     )
     parser.add_argument(
         "fecha",
@@ -616,7 +861,7 @@ def main():
         fecha_objetivo = validar_fecha(args.fecha)
         agentes = parsear_usuarios_md(USUARIOS_MD)
         agente = detectar_agente(agentes)
-        usuarios, omitidos = usuarios_propios_del_agente(agentes, agente["id"])
+        usuarios = usuarios_del_agente(agentes, agente["id"])
         api_key = resolver_credencial_redmine(REDMINE_CREDENTIAL_USER)
         entradas = obtener_time_entries_fecha(api_key, fecha_objetivo)
         filas = construir_filas(
@@ -632,11 +877,7 @@ def main():
 
     print(f"Fecha de carga procesada: {fecha_objetivo.isoformat()}")
     print(f"Agente: {agente['id']} ({agente.get('nombre') or '-'})")
-    print(f"Usuarios propios del agente: {len(usuarios)}")
-    print(
-        "Usuarios omitidos por estar asignados primero a otro agente: "
-        f"{len(omitidos)}"
-    )
+    print(f"Usuarios del agente: {len(usuarios)}")
     print()
 
     if not filas:
@@ -646,9 +887,31 @@ def main():
         )
         return RC_SIN_ACTIVIDAD
 
-    imprimir_grilla(filas)
-    print()
+    try:
+        resultado_db = guardar_filas_mysql(
+            filas,
+            agente["id"],
+        )
+    except Exception as exc:
+        print(
+            f"ERROR | {exc}",
+            file=sys.stderr,
+        )
+        return RC_ERROR
+
     print(f"Tiempos encontrados: {len(filas)}")
+    print(
+        "Insertados: "
+        f"{resultado_db['insertados']}"
+    )
+    print(
+        "Actualizados: "
+        f"{resultado_db['actualizados']}"
+    )
+    print(
+        "Omitidos por pertenecer a otro agente: "
+        f"{resultado_db['omitidos_otro_agente']}"
+    )
     return RC_OK
 
 

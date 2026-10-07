@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
@@ -460,94 +461,182 @@ def extraer_texto(content):
     return "\n".join(textos)
 
 
-def ruta_base_agente():
-    return os.path.expanduser(
-        "~/.openclaw/agents/main/agent/openclaw-agent.sqlite"
+def resolver_db_agente():
+    state_dir = os.environ.get(
+        "OPENCLAW_STATE_DIR"
     )
 
-
-def obtener_cadena_session_ids(
-    conexion,
-    session_id,
-):
-    session_ids = []
-    vistos = set()
-    actual = session_id
-
-    while actual and actual not in vistos:
-        vistos.add(actual)
-        session_ids.append(actual)
-
-        fila = conexion.execute(
-            "SELECT previous_session_id "
-            "FROM session_windows "
-            "WHERE session_id = ?",
-            (actual,),
-        ).fetchone()
-
-        if not fila:
-            break
-
-        actual = fila[0]
-
-    return session_ids
-
-
-def obtener_mensajes_fecha(
-    session_id,
-    fecha_objetivo,
-):
-    if not session_id:
-        return []
-
-    db_path = ruta_base_agente()
-
-    if not os.path.isfile(db_path):
-        raise RuntimeError(
-            f"No existe la base del agente: {db_path}"
+    if state_dir:
+        base = Path(
+            state_dir
+        ).expanduser()
+    else:
+        base = (
+            Path.home()
+            / ".openclaw"
         )
 
-    mensajes = []
+    db_path = (
+        base
+        / "agents"
+        / AGENT_ID
+        / "agent"
+        / "openclaw-agent.sqlite"
+    )
 
-    uri = f"file:{db_path}?mode=ro"
+    if not db_path.is_file():
+        raise RuntimeError(
+            "No se encontró la base "
+            f"de sesiones: {db_path}"
+        )
 
-    with sqlite3.connect(
+    return db_path
+
+
+def abrir_db_lectura():
+    db_path = resolver_db_agente()
+
+    uri = (
+        "file:"
+        + str(db_path.resolve())
+        + "?mode=ro"
+    )
+
+    conn = sqlite3.connect(
         uri,
         uri=True,
         timeout=30,
-    ) as conexion:
-        conexion.execute("PRAGMA query_only = ON")
+    )
 
-        session_ids = obtener_cadena_session_ids(
-            conexion,
-            session_id,
+    conn.execute(
+        "PRAGMA query_only = ON"
+    )
+
+    return conn
+
+
+def obtener_linea_sesiones(
+    conn,
+    session_key,
+    current_session_id,
+):
+    if not current_session_id:
+        raise RuntimeError(
+            "La sesión activa no tiene "
+            "sessionId."
         )
 
-        for sid in session_ids:
-            filas = conexion.execute(
-                "SELECT message_id, role, text, timestamp "
-                "FROM session_transcript_fts "
-                "WHERE session_id = ?",
-                (sid,),
+    rows = conn.execute(
+        """
+        WITH RECURSIVE lineage(
+            session_id,
+            previous_session_id,
+            created_at
+        ) AS (
+            SELECT
+                session_id,
+                previous_session_id,
+                created_at
+            FROM session_windows
+            WHERE session_id = ?
+              AND session_key = ?
+
+            UNION ALL
+
+            SELECT
+                w.session_id,
+                w.previous_session_id,
+                w.created_at
+            FROM session_windows AS w
+            JOIN lineage AS l
+              ON w.session_id =
+                 l.previous_session_id
+            WHERE w.session_key = ?
+        )
+        SELECT
+            session_id,
+            created_at
+        FROM lineage
+        ORDER BY created_at ASC,
+                 session_id ASC
+        """,
+        (
+            current_session_id,
+            session_key,
+            session_key,
+        ),
+    ).fetchall()
+
+    if not rows:
+        raise RuntimeError(
+            "No se encontró la línea "
+            "histórica de la sesión "
+            f"{session_key}."
+        )
+
+    return [
+        row[0]
+        for row in rows
+    ]
+
+
+def obtener_mensajes_fecha(
+    openclaw,
+    session_key,
+    current_session_id,
+    fecha_objetivo,
+):
+    del openclaw
+
+    mensajes = []
+    sesiones_con_actividad = []
+
+    conn = abrir_db_lectura()
+
+    try:
+        session_ids = (
+            obtener_linea_sesiones(
+                conn,
+                session_key,
+                current_session_id,
+            )
+        )
+
+        for session_id in session_ids:
+            rows = conn.execute(
+                """
+                SELECT
+                    rowid,
+                    message_id,
+                    role,
+                    text,
+                    timestamp
+                FROM session_transcript_fts
+                WHERE session_id = ?
+                  AND role IN (
+                      'user',
+                      'assistant'
+                  )
+                ORDER BY
+                    CAST(timestamp AS INTEGER) ASC,
+                    rowid ASC
+                """,
+                (session_id,),
             ).fetchall()
 
-            for mensaje_id, role, texto, timestamp in filas:
-                if role not in (
-                    "user",
-                    "assistant",
-                ):
-                    continue
+            tiene_actividad = False
 
-                if not isinstance(texto, str):
-                    continue
-
-                texto = texto.strip()
-
-                if not texto:
-                    continue
-
-                fecha_hora = timestamp_local(
-                    timestamp
+            for (
+                rowid,
+                message_id,
+                role,
+                text,
+                timestamp_ms,
+            ) in rows:
+                fecha_hora = (
+                    timestamp_local(
+                        timestamp_ms
+                    )
                 )
 
                 if fecha_hora is None:
@@ -559,17 +648,45 @@ def obtener_mensajes_fecha(
                 ):
                     continue
 
+                if not isinstance(
+                    text,
+                    str,
+                ):
+                    continue
+
+                text = text.strip()
+
+                if not text:
+                    continue
+
+                tiene_actividad = True
+
                 mensajes.append(
                     {
-                        "id": mensaje_id or "",
-                        "timestamp": fecha_hora,
+                        "id": (
+                            message_id
+                            or f"fts:{session_id}:{rowid}"
+                        ),
+                        "timestamp": (
+                            fecha_hora
+                        ),
                         "role": role,
-                        "text": texto,
+                        "text": text,
                     }
                 )
 
-    return mensajes
+            if tiene_actividad:
+                sesiones_con_actividad.append(
+                    session_id
+                )
 
+    finally:
+        conn.close()
+
+    return (
+        mensajes,
+        sesiones_con_actividad,
+    )
 
 def deduplicar_mensajes(mensajes):
     resultado = []
@@ -928,11 +1045,18 @@ def main():
 
     for sesion in sesiones:
         try:
+            (
+                mensajes_sesion,
+                _session_ids_actividad,
+            ) = obtener_mensajes_fecha(
+                openclaw,
+                sesion["key"],
+                sesion.get("sessionId"),
+                fecha_objetivo,
+            )
+
             mensajes.extend(
-                obtener_mensajes_fecha(
-                    sesion.get("sessionId"),
-                    fecha_objetivo,
-                )
+                mensajes_sesion
             )
 
         except Exception as exc:
