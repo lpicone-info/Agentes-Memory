@@ -1,0 +1,10 @@
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L160] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L161] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 100% left ⏱6d 18h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L162] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L163] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 0% · Short-term 0% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — sign-in expired 3. agente99＿ia@infomedical.com.ar ChatGPT subsc
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L164] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L165] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 0% · Short-term 0% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente99＿ia@infomedical.com.ar ChatGPT s
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L166] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L167] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 19% · Short-term 22% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente99＿ia@infomedical.com.ar ChatGPT
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L168] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L169] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 78% left ⏱3h 39m · secondary 81% left ⏱6d 10h MCP servers: 1 Skills: 6
