@@ -1,0 +1,12 @@
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L170] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L171] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 85% left ⏱4h 14m · secondary 73% left ⏱5d 18h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L172] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L173] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 27% · Short-term 15% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente99＿ia@infomedical.com.ar ChatGPT
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L174] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L175] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente02＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 62% left ⏱5d 13h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L176] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L177] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 38% · Short-term 0% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente99＿ia@infomedical.com.ar ChatGPT 
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L178] User: /codex status
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L179] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente99＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 100% left ⏱6d 23h MCP servers: 1 Skills: 6
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L180] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L181] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 54% · Short-term 100% · Resets in 2 hours Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — rate-limited - resets in 3 hours 3. agen
