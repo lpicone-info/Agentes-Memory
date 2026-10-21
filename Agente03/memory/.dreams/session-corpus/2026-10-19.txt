@@ -1,0 +1,4 @@
+[main/sessions/main/0bbaa2bf-1b8f-41f0-950d-ce5f7a1f844d#L321] User: /codex status
+[main/sessions/main/0bbaa2bf-1b8f-41f0-950d-ce5f7a1f844d#L322] Assistant: Codex app-server: connected Models: gpt-6-astra, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente03＿ia@infomedical.com.ar Rate limits: Codex: primary 100% left ⏱4h 59m · secondary 100% left ⏱5d 18h MCP servers: 1 Skills: 6
+[main/sessions/main/0bbaa2bf-1b8f-41f0-950d-ce5f7a1f844d#L323] User: /codex account
+[main/sessions/main/0bbaa2bf-1b8f-41f0-950d-ce5f7a1f844d#L324] Assistant: Subscription agente03＿ia@infomedical.com.ar Weekly 0% · Short-term 0% Auth order 1. agente03＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente99＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente05＿ia@infomedical.com.ar ChatGPT s
