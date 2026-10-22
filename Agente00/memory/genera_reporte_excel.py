@@ -28,6 +28,71 @@ MYSQL_DATABASE = "metricas"
 HOST_PERMITIDO = "desarrollo-ia-00"
 
 
+CLASIFICACION_AGENTES = [
+    {
+        "id_agente": "Agente08",
+        "agente": "Mafalda",
+        "categoria": "Proyecto Est\u00e1ndar",
+        "equipo": "Atenci\u00f3n al cliente",
+        "usuarios_habilitados": 5,
+    },
+    {
+        "id_agente": "Agente07",
+        "agente": "Bender",
+        "categoria": "Proyecto Est\u00e1ndar",
+        "equipo": "An\u00e1lisis y dise\u00f1o",
+        "usuarios_habilitados": 7,
+    },
+    {
+        "id_agente": "Agente03",
+        "agente": "Stan",
+        "categoria": "Proyecto Est\u00e1ndar",
+        "equipo": "Desarrollo",
+        "usuarios_habilitados": 6,
+    },
+    {
+        "id_agente": "Agente04",
+        "agente": "La 99",
+        "categoria": "Proyecto Especial",
+        "equipo": "Swiss Medical",
+        "usuarios_habilitados": 7,
+    },
+    {
+        "id_agente": "Agente05",
+        "agente": "Lisa",
+        "categoria": "Proyecto Especial",
+        "equipo": "Coomeva Presmed",
+        "usuarios_habilitados": 6,
+    },
+    {
+        "id_agente": "Agente01",
+        "agente": "Maxxuel",
+        "categoria": "Proyecto Especial",
+        "equipo": "Coomeva Afilmed",
+        "usuarios_habilitados": 4,
+    },
+    {
+        "id_agente": "Agente06",
+        "agente": "Homero",
+        "categoria": "Proyecto Especial",
+        "equipo": "Prevenci\u00f3n-Brit\u00e1nico",
+        "usuarios_habilitados": 6,
+    },
+    {
+        "id_agente": "Agente02",
+        "agente": "Camaron",
+        "categoria": "Proyecto Est\u00e1ndar",
+        "equipo": "Desarrollo web",
+        "usuarios_habilitados": 2,
+    },
+]
+
+CLASIFICACION_POR_ID = {
+    item["id_agente"].casefold(): item
+    for item in CLASIFICACION_AGENTES
+}
+
+
 def validar_agente():
     hostname = socket.gethostname().split(".")[0]
 
@@ -145,6 +210,7 @@ SELECT JSON_OBJECT(
     'id_agente', id_agente,
     'agente', agente,
     'usuario', usuario,
+    'id_usuario', id_usuario,
     'fecha',
         DATE_FORMAT(fecha, '%Y-%m-%d'),
     'hora_inicio',
@@ -167,6 +233,8 @@ SELECT JSON_OBJECT(
         SEC_TO_TIME(
             tiempo_agente_segundos
         ),
+    'tiempo_agente_segundos',
+        tiempo_agente_segundos,
     'tareas',
         tareas
 )
@@ -244,6 +312,223 @@ ORDER BY
         sql
     )
 
+
+
+def obtener_clasificacion(id_agente):
+    clave = str(id_agente or "").strip().casefold()
+    clasificacion = CLASIFICACION_POR_ID.get(clave)
+
+    if clasificacion is None:
+        raise RuntimeError(
+            "No existe clasificacion configurada para "
+            f"el agente: {id_agente or 'SIN ID'}"
+        )
+
+    return clasificacion
+
+
+def entero_seguro(valor):
+    if valor is None or valor == "":
+        return 0
+
+    return int(valor)
+
+
+def clave_primera_interaccion(fila):
+    return (
+        fila.get("fecha") or "9999-12-31",
+        fila.get("hora_inicio") or "23:59:59",
+        str(fila.get("id_agente") or "").casefold(),
+    )
+
+
+def calcular_porcentajes_100(valores):
+    valores = [max(0, int(valor)) for valor in valores]
+    total = sum(valores)
+
+    if total == 0:
+        return [0.0 for _ in valores]
+
+    bases = []
+    restos = []
+
+    for indice, valor in enumerate(valores):
+        base, resto = divmod(valor * 10000, total)
+        bases.append(base)
+        restos.append((resto, indice))
+
+    faltantes = 10000 - sum(bases)
+
+    for _, indice in sorted(
+        restos,
+        key=lambda item: (item[0], -item[1]),
+        reverse=True,
+    )[:faltantes]:
+        bases[indice] += 1
+
+    return [base / 10000.0 for base in bases]
+
+
+
+def construir_interaccion_agente_por_equipo(interacciones):
+    acumulados = {}
+
+    for config in CLASIFICACION_AGENTES:
+        acumulados[config["id_agente"].casefold()] = {
+            "peticion": 0,
+            "segundos": 0,
+            "usuarios": set(),
+        }
+
+    for fila in interacciones:
+        config = obtener_clasificacion(
+            fila.get("id_agente")
+        )
+        clave = config["id_agente"].casefold()
+        cantidad = entero_seguro(
+            fila.get("cantidad_interacciones")
+        )
+        segundos = entero_seguro(
+            fila.get("tiempo_agente_segundos")
+        )
+
+        acumulados[clave]["peticion"] += cantidad
+        acumulados[clave]["segundos"] += segundos
+
+        user_id = fila.get("id_usuario")
+        if cantidad > 0 and user_id:
+            acumulados[clave]["usuarios"].add(
+                str(user_id)
+            )
+
+    peticiones = [
+        acumulados[config["id_agente"].casefold()]["peticion"]
+        for config in CLASIFICACION_AGENTES
+    ]
+    segundos_agentes = [
+        acumulados[config["id_agente"].casefold()]["segundos"]
+        for config in CLASIFICACION_AGENTES
+    ]
+    porcentajes_peticion = calcular_porcentajes_100(
+        peticiones
+    )
+    porcentajes_horas = calcular_porcentajes_100(
+        segundos_agentes
+    )
+
+    filas = []
+
+    for indice, config in enumerate(CLASIFICACION_AGENTES):
+        datos = acumulados[
+            config["id_agente"].casefold()
+        ]
+
+        filas.append(
+            {
+                "agente": config["agente"],
+                "categoria": config["categoria"],
+                "equipo": config["equipo"],
+                "peticion": datos["peticion"],
+                "porcentaje_peticion": (
+                    porcentajes_peticion[indice]
+                ),
+                "horas_agente": (
+                    datos["segundos"] / 3600.0
+                ),
+                "porcentaje_horas": (
+                    porcentajes_horas[indice]
+                ),
+                "usuarios_habilitados": (
+                    config["usuarios_habilitados"]
+                ),
+                "usuarios_participantes": len(
+                    datos["usuarios"]
+                ),
+            }
+        )
+
+    return filas
+
+def construir_interaccion_usuario_por_equipo(interacciones):
+    acumulados = {}
+
+    for fila in interacciones:
+        user_id = fila.get("id_usuario")
+
+        if not user_id:
+            continue
+
+        config = obtener_clasificacion(
+            fila.get("id_agente")
+        )
+        clave_usuario = str(user_id)
+        clave_interaccion = clave_primera_interaccion(
+            fila
+        )
+
+        if clave_usuario not in acumulados:
+            acumulados[clave_usuario] = {
+                "usuario": fila.get("usuario") or clave_usuario,
+                "peticion": 0,
+                "segundos": 0,
+                "primera_clave": clave_interaccion,
+                "categoria": config["categoria"],
+                "equipo": config["equipo"],
+            }
+
+        datos = acumulados[clave_usuario]
+        datos["peticion"] += entero_seguro(
+            fila.get("cantidad_interacciones")
+        )
+        datos["segundos"] += entero_seguro(
+            fila.get("tiempo_agente_segundos")
+        )
+
+        if clave_interaccion < datos["primera_clave"]:
+            datos["primera_clave"] = clave_interaccion
+            datos["categoria"] = config["categoria"]
+            datos["equipo"] = config["equipo"]
+            datos["usuario"] = (
+                fila.get("usuario") or clave_usuario
+            )
+
+    datos_ordenados = sorted(
+        acumulados.values(),
+        key=lambda datos: (
+            str(datos["usuario"]).casefold(),
+            datos["equipo"].casefold(),
+        ),
+    )
+
+    porcentajes_peticion = calcular_porcentajes_100(
+        [datos["peticion"] for datos in datos_ordenados]
+    )
+    porcentajes_horas = calcular_porcentajes_100(
+        [datos["segundos"] for datos in datos_ordenados]
+    )
+
+    filas = []
+
+    for indice, datos in enumerate(datos_ordenados):
+        filas.append(
+            {
+                "usuario": datos["usuario"],
+                "categoria": datos["categoria"],
+                "equipo": datos["equipo"],
+                "peticion": datos["peticion"],
+                "porcentaje_peticion": (
+                    porcentajes_peticion[indice]
+                ),
+                "horas_agente": (
+                    datos["segundos"] / 3600.0
+                ),
+                "porcentaje_horas": (
+                    porcentajes_horas[indice]
+                ),
+            }
+        )
+
+    return filas
 
 def propiedad(
     nombre,
@@ -512,6 +797,45 @@ def activar_autofiltro(
         pass
 
 
+
+def aplicar_formato_numerico(
+    documento,
+    hoja,
+    columna,
+    cantidad_filas,
+    formato,
+):
+    if cantidad_filas <= 0:
+        return
+
+    try:
+        locale = uno.createUnoStruct(
+            "com.sun.star.lang.Locale"
+        )
+        formatos = documento.getNumberFormats()
+        clave = formatos.queryKey(
+            formato,
+            locale,
+            True,
+        )
+
+        if clave == -1:
+            clave = formatos.addNew(
+                formato,
+                locale,
+            )
+
+        rango = hoja.getCellRangeByPosition(
+            columna,
+            1,
+            columna,
+            cantidad_filas,
+        )
+        rango.NumberFormat = clave
+
+    except Exception:
+        pass
+
 def congelar_primera_fila(
     documento,
     hoja,
@@ -539,6 +863,8 @@ def generar_excel(
     salida,
     interacciones,
     tiempos_redmine,
+    interaccion_agente_equipo,
+    interaccion_usuario_equipo,
 ):
     (
         contexto,
@@ -599,6 +925,28 @@ def generar_excel(
         hoja_redmine = (
             hojas.getByName(
                 "Tiempos Redmine"
+            )
+        )
+
+        hojas.insertNewByName(
+            "Interaccion agente por equipo",
+            2,
+        )
+
+        hoja_agente_equipo = (
+            hojas.getByName(
+                "Interaccion agente por equipo"
+            )
+        )
+
+        hojas.insertNewByName(
+            "Interaccion usuario por equipo",
+            3,
+        )
+
+        hoja_usuario_equipo = (
+            hojas.getByName(
+                "Interaccion usuario por equipo"
             )
         )
 
@@ -727,6 +1075,186 @@ def generar_excel(
         congelar_primera_fila(
             documento,
             hoja_redmine,
+        )
+
+        encabezados_agente_equipo = [
+            "Agente",
+            "Categor\u00eda",
+            "Equipo",
+            "Petici\u00f3n",
+            "% Petici\u00f3n",
+            "Horas agente",
+            "% Horas",
+            "Usuarios habilitados",
+            "Usuarios participantes",
+        ]
+
+        claves_agente_equipo = [
+            "agente",
+            "categoria",
+            "equipo",
+            "peticion",
+            "porcentaje_peticion",
+            "horas_agente",
+            "porcentaje_horas",
+            "usuarios_habilitados",
+            "usuarios_participantes",
+        ]
+
+        anchos_agente_equipo = [
+            3500,
+            4200,
+            5000,
+            2600,
+            3000,
+            3200,
+            2600,
+            4300,
+            4800,
+        ]
+
+        escribir_tabla(
+            hoja_agente_equipo,
+            encabezados_agente_equipo,
+            claves_agente_equipo,
+            interaccion_agente_equipo,
+            anchos_agente_equipo,
+        )
+
+        activar_autofiltro(
+            documento,
+            hoja_agente_equipo,
+            "FiltroAgenteEquipo",
+            len(encabezados_agente_equipo),
+            len(interaccion_agente_equipo),
+        )
+
+        congelar_primera_fila(
+            documento,
+            hoja_agente_equipo,
+        )
+
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            3,
+            len(interaccion_agente_equipo),
+            "0",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            4,
+            len(interaccion_agente_equipo),
+            "0.00%",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            5,
+            len(interaccion_agente_equipo),
+            "0.00",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            6,
+            len(interaccion_agente_equipo),
+            "0.00%",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            7,
+            len(interaccion_agente_equipo),
+            "0",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_agente_equipo,
+            8,
+            len(interaccion_agente_equipo),
+            "0",
+        )
+
+        encabezados_usuario_equipo = [
+            "Usuario",
+            "Categor\u00eda",
+            "Equipo",
+            "Petici\u00f3n",
+            "% Petici\u00f3n",
+            "Horas agente",
+            "% Horas",
+        ]
+
+        claves_usuario_equipo = [
+            "usuario",
+            "categoria",
+            "equipo",
+            "peticion",
+            "porcentaje_peticion",
+            "horas_agente",
+            "porcentaje_horas",
+        ]
+
+        anchos_usuario_equipo = [
+            5000,
+            4200,
+            5000,
+            2600,
+            3000,
+            3200,
+            2600,
+        ]
+
+        escribir_tabla(
+            hoja_usuario_equipo,
+            encabezados_usuario_equipo,
+            claves_usuario_equipo,
+            interaccion_usuario_equipo,
+            anchos_usuario_equipo,
+        )
+
+        activar_autofiltro(
+            documento,
+            hoja_usuario_equipo,
+            "FiltroUsuarioEquipo",
+            len(encabezados_usuario_equipo),
+            len(interaccion_usuario_equipo),
+        )
+
+        congelar_primera_fila(
+            documento,
+            hoja_usuario_equipo,
+        )
+
+        aplicar_formato_numerico(
+            documento,
+            hoja_usuario_equipo,
+            3,
+            len(interaccion_usuario_equipo),
+            "0",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_usuario_equipo,
+            4,
+            len(interaccion_usuario_equipo),
+            "0.00%",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_usuario_equipo,
+            5,
+            len(interaccion_usuario_equipo),
+            "0.00",
+        )
+        aplicar_formato_numerico(
+            documento,
+            hoja_usuario_equipo,
+            6,
+            len(interaccion_usuario_equipo),
+            "0.00%",
         )
 
         salida.parent.mkdir(
@@ -884,6 +1412,22 @@ def main():
         )
 
         print(
+            "Calculando resumenes por equipo..."
+        )
+
+        interaccion_agente_equipo = (
+            construir_interaccion_agente_por_equipo(
+                interacciones
+            )
+        )
+
+        interaccion_usuario_equipo = (
+            construir_interaccion_usuario_por_equipo(
+                interacciones
+            )
+        )
+
+        print(
             "Generando Excel..."
         )
 
@@ -891,6 +1435,8 @@ def main():
             salida,
             interacciones,
             tiempos_redmine,
+            interaccion_agente_equipo,
+            interaccion_usuario_equipo,
         )
 
         print()
@@ -903,6 +1449,16 @@ def main():
         print(
             "Tiempos Redmine: "
             f"{len(tiempos_redmine)}"
+        )
+
+        print(
+            "Agentes por equipo: "
+            f"{len(interaccion_agente_equipo)}"
+        )
+
+        print(
+            "Usuarios por equipo: "
+            f"{len(interaccion_usuario_equipo)}"
         )
 
         print(
@@ -923,3 +1479,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
