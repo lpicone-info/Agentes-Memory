@@ -1,0 +1,5 @@
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1879] User: quiero preguntarte sobre el caso CP-02 — Rechazos de negocio
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1880] Assistant: Claro, Alejandro. Indicame qué aspecto necesitás revisar de **CP-02 — Rechazos de negocio**: datos de prueba, ejecución, mensajes esperados o validación del `RETURN`.
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1881] User: que quiere decir: Disponer de D2 y D3, confirmados por consultas directas antes de ejecutar
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1882] Assistant: Voy a recuperar la definición exacta de D2 y D3 del mapa para explicarte cómo preparar ambos datos de prueba.
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1885] Assistant: Significa que, antes de ejecutar **CP-02**, deben seleccionarse y comprobarse dos NIT con condiciones diferentes: ### D2 — NIT inexistente Un NIT numérico válido que no corresponda a ningún registro de `PRESTADORES`. Ejemplo: ```text 123456789123456 ``` La consulta dir
