@@ -1,0 +1,2 @@
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1978] Assistant: Hola Alejandro, ¿en qué avanzamos?
+[main/sessions/main/624bf842-c877-4e81-b5cf-7183b0d6a0da#L1979] User: necesito que para el caso de prueba: CP-06 — Cálculo de tarifa y exclusión de valores, me brindes el paso a paso para probarlo y ejemplos con NIT para probar contra la SP. Con estas premisas: Objetivo: Comprobar el cálculo exacto de VALOR_TARIFA y la exclusión de conceptos 
