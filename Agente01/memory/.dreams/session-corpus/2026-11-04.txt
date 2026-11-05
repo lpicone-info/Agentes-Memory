@@ -1,0 +1,5 @@
+[main/sessions/main/025192bd-5921-48da-9129-00e4a9a36181#L173] Assistant: Voy a cargar el contexto operativo y tus preferencias antes de responder.
+[main/sessions/main/025192bd-5921-48da-9129-00e4a9a36181#L188] Assistant: Hola Luis, ya cargue tus preferencias y estoy disponible para trabajar. ¿En qué avanzamos?
+[main/sessions/main/f9d11bc7-b95d-4f83-92dd-7eb3d8ff4100#L5390] User: dasme un contrato , de alta nueva, que haya pasado por auditoria medica, y completado DDjj, , impactado con mas de un integrante
+[main/sessions/main/f9d11bc7-b95d-4f83-92dd-7eb3d8ff4100#L5391] Assistant: Savina, ¿en qué perfil de base de datos debo buscar el contrato: `PreCoreMP`, `PreProductivoMP` u otro?
+[main/sessions/main/f9d11bc7-b95d-4f83-92dd-7eb3d8ff4100#L5392] User: preubascoreinfomedicalo
