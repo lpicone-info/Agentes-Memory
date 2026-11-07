@@ -1,0 +1,6 @@
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3398] User: buen dia!!
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3399] Assistant: ¡Buen día, César! ¿En qué avanzamos?
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3400] User: mo podrias decir como se representa el estado liquidado del expediente ?
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3401] Assistant: César, el estado **Liquidado** no se guarda como un código independiente: se determina por el campo: ```sql EXPEDIENTES.liqui_fecha ``` Cuando `liqui_fecha IS NOT NULL`, el procedimiento devuelve: ```sql esta_deno = 'Liquidado' ``` En WebPOS llega al JSON como `estaDen
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L468] User: /codex account
+[main/sessions/main/e427b2c1-313d-4508-8e0b-8c375a2e347a#L469] Assistant: Subscription agente02＿ia@infomedical.com.ar Weekly 81% · Short-term 23% Auth order 1. agente02＿ia@infomedical.com.ar ChatGPT subscription — active now 2. agente03＿ia@infomedical.com.ar ChatGPT subscription — available if needed 3. agente99＿ia@infomedical.com.ar ChatGPT
