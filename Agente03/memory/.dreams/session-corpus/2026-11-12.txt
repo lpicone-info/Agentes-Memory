@@ -1,0 +1,5 @@
+[main/sessions/main/57f9c695-84ef-491b-bdd1-6081f2b8a156#L3517] User: hola stan
+[main/sessions/main/57f9c695-84ef-491b-bdd1-6081f2b8a156#L3518] Assistant: Hola Federico, estoy disponible. ¿En qué avanzamos?
+[main/sessions/main/57f9c695-84ef-491b-bdd1-6081f2b8a156#L3519] User: INSTRUCCIÓN PREVIA (obligatoria, antes de hacer cualquier otra cosa): 1. Bajo mis credenciales del SVN, leé el prompt completo desde la URL de PROMPT SVN. Esa es la única fuente de instrucciones de esta tarea. 2. Si no podés acceder, reintentá hasta 3 veces, esperando unos 
+[main/sessions/main/57f9c695-84ef-491b-bdd1-6081f2b8a156#L3519] User: — revisión <Last Changed Rev del archivo>" y, debajo, la lista de secciones (número y título) de su INFORME A GENERAR, copiada del prompt que acabás de leer. Después ejecutalo con los parámetros de abajo y generá el informe exactamente con esas secciones. PROMPT SVN : [http
+[main/sessions/main/57f9c695-84ef-491b-bdd1-6081f2b8a156#L3519] User: [ticket_30457_05_validar.md] OBSERVACIONES : []
