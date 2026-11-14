@@ -1,0 +1,2 @@
+[main/sessions/main/72f6983b-fdd6-489d-a8ab-b03d0c44105e#L8336] User: revisa en la rama 25.03_FIX cuándo se persisten registros en la tabla COMPRO_AFIP_REFERENCIA y cuál es la lógica empleada para armar el registro a insertar.
+[main/sessions/main/72f6983b-fdd6-489d-a8ab-b03d0c44105e#L8337] Assistant: Maru, para revisar la rama `25.03_FIX` debo actualizar primero su working copy SVN, según tus preferencias. ¿Confirmás que ejecute `svn update` sobre `mpariso-V25.03_FIX`?
