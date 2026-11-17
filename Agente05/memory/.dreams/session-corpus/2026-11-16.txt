@@ -1,0 +1,5 @@
+[main/sessions/main/fa517540-2082-4e39-b6d2-906ef93ec481#L33] Assistant: Hola Norma, ya cargue tus preferencias y estoy disponible para trabajar. ¿En qué avanzamos?
+[main/sessions/main/fa517540-2082-4e39-b6d2-906ef93ec481#L34] User: dame los profiles q tenes disponibles
+[main/sessions/main/fa517540-2082-4e39-b6d2-906ef93ec481#L35] Assistant: Norma, ¿a qué número de Redmine corresponde esta consulta?
+[main/sessions/main/fa517540-2082-4e39-b6d2-906ef93ec481#L36] User: ninguno
+[main/sessions/main/fa517540-2082-4e39-b6d2-906ef93ec481#L37] Assistant: Norma, los profiles disponibles son: - `InstallQA_89` — SQL Server - `InstallQA` — SQL Server - `PruebasCoreINFOMEDICAL` — SQL Server - `PruebasCorePrestadores` — MS SQL
