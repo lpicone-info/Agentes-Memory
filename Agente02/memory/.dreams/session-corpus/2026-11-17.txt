@@ -1,0 +1,2 @@
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3539] User: teniendo en cuenta la rama clon podrias identificar desde donde se esta llamando aru_bajas_transac y si puede llamarse para anular una 05
+[main/sessions/main/a72e2397-6556-4a43-8819-584cb5f59e71#L3540] Assistant: César, voy a rastrear en la rama CLON todas las referencias a `aru_bajas_transac` y verificar sus condiciones y parámetros para determinar si alcanza a una transacción `05`.
