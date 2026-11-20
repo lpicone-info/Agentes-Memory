@@ -1,6 +1,9 @@
-name: Prueba HTML de memorias (sin publicar)
+name: Publicar memorias en GitHub Pages
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -8,8 +11,12 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "github-pages"
+  cancel-in-progress: false
+
 jobs:
-  probar-html:
+  construir:
     runs-on: ubuntu-latest
     steps:
       - name: Descargar repositorio publico
@@ -45,7 +52,7 @@ jobs:
                   blocks_protected += n
           print(f'Prepared {files_changed} temporary files; protected {blocks_protected} file blocks')
           PY
-          git diff --exit-code -- 'Agente*/memory'
+          git diff --exit-code -- .
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
@@ -73,7 +80,18 @@ jobs:
           print(f'PASS: {len(headings)} HTML h3 headings, including the ones after the attachment')
           PY
 
-      - name: Guardar HTML para revisar (no publica en Pages)
+      - name: Preparar artefacto para Pages
         uses: actions/upload-pages-artifact@v4
         with:
           path: ./_site
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
