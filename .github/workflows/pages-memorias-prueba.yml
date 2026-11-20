@@ -1,0 +1,79 @@
+name: Prueba HTML de memorias (sin publicar)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  probar-html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio publico
+        uses: actions/checkout@v4
+
+      - name: Preparar copia temporal para Pages
+        shell: bash
+        run: |
+          mkdir -p .pages-source
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.pages-source' --exclude='_site' ./ .pages-source/
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          base = Path('.pages-source')
+          block = re.compile(r'(?ms)^<file\b[^\n]*>\n.*?^</file>[ \t]*(?=\n|$)')
+          files_changed = 0
+          blocks_protected = 0
+          for md in base.glob('Agente*/memory/**/*.md'):
+              found = re.search(r'-(\d{4}-\d{2}-\d{2})\.md$', md.name)
+              if not found or found.group(1) < '2026-11-19':
+                  continue
+              source = md.read_text(encoding='utf-8')
+              def protect(match):
+                  raw = match.group(0)
+                  longest = max((len(s) for s in re.findall(r'~+', raw)), default=0)
+                  fence = '~' * max(3, longest + 1)
+                  return f'{fence}text\n{raw}\n{fence}'
+              updated, n = block.subn(protect, source)
+              if n:
+                  md.write_text(updated, encoding='utf-8')
+                  files_changed += 1
+                  blocks_protected += n
+          print(f'Prepared {files_changed} temporary files; protected {blocks_protected} file blocks')
+          PY
+          git diff --exit-code -- 'Agente*/memory'
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Generar HTML con Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./.pages-source
+          destination: ./_site
+
+      - name: Verificar HTML corregido del Agente08
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('_site/Agente08/memory/MEMORY-users_113373607595606911178-2026-11-19.html')
+          if not path.exists():
+              raise SystemExit(f'FAIL: not generated: {path}')
+          html = path.read_text(encoding='utf-8')
+          headings = re.findall(r'<h3\b[^>]*>(.*?)</h3>', html, flags=re.I|re.S)
+          for time in ('12:32:47', '12:40:01', '12:51:00'):
+              if not any(time in heading for heading in headings):
+                  raise SystemExit(f'FAIL: missing formatted heading: {time}')
+          print(f'PASS: {len(headings)} HTML h3 headings, including the ones after the attachment')
+          PY
+
+      - name: Guardar HTML para revisar (no publica en Pages)
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
