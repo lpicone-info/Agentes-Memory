@@ -1,0 +1,2 @@
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L561] User: /codex status
+[main/sessions/main/b75744d9-5b29-4777-9c72-481cb040eb90#L562] Assistant: Codex app-server: connected Models: gpt-6.1-sol, gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna Account: agente99＿ia@infomedical.com.ar Rate limits: Codex: primary 89% left ⏱3h 32m · secondary 5% left ⏱3d 20h MCP servers: 1 
